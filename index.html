@@ -101,6 +101,7 @@ body{font-family:system-ui,sans-serif;color:#1a1a1a;background:#0B1F3A url('Buil
     <div style="font-family:'Arial Black',sans-serif;font-size:22px;font-weight:900;color:#E67E22;letter-spacing:.12em;font-style:italic;text-transform:uppercase;line-height:1">BUILT DIFFERENT SPORTS</div>
     <div id="header-subtitle" style="font-family:'Arial Black',sans-serif;font-size:11px;color:#0B1F3A;letter-spacing:.3em;text-transform:uppercase;margin-top:3px;min-height:16px"></div>
   </div>
+  <button onclick="syncAllFromSupabase()" id="sync-btn" title="Sync latest data from all devices" style="background:#f0f0f0;border:none;border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:600;color:#555;font-family:inherit;display:flex;align-items:center;gap:5px">&#8635; Sync</button>
 </div>
 
 <!-- LANDING SCREEN -->
@@ -194,6 +195,7 @@ body{font-family:system-ui,sans-serif;color:#1a1a1a;background:#0B1F3A url('Buil
       <div id="player-meta-display" style="font-size:12px;color:#999;margin-top:2px"></div>
     </div>
     <button onclick="openPlayerDeleteModal()" style="background:#f0f0f0;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:16px;color:#999;flex-shrink:0" title="Player options">&#8943;</button>
+    <button onclick="refreshPlayerFromSupabase(currentPlayerId)" style="background:#f0f0f0;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px;color:#999;flex-shrink:0" title="Sync latest data">&#8635;</button>
   </div>
 
   <div class="session-banner" id="session-banner-display"></div>
@@ -2138,16 +2140,12 @@ function openPlayer(id) {
   document.getElementById("session-banner-display").innerHTML =
     "&#9679; " + (programLabels[p.program] || "8-Week Skills Program") + " &mdash; " + p.name;
 
-  // Reset and rebuild state for this player
+  // Show screen immediately with localStorage data
   resetPlayerState(p);
-
-  // Load profile fields for this player
   loadProfileFields(p);
-
-  // Show player screen
   showScreen("player-screen");
 
-  // Wire profile fields to save dev profile on blur
+  // Wire profile fields to save on blur
   setTimeout(function(){
     var handler = function(){ saveCurrentDevProfile(); };
     document.querySelectorAll("#view-profile .profile-inp, #view-profile .profile-ta").forEach(function(f){
@@ -2157,6 +2155,65 @@ function openPlayer(id) {
   }, 100);
 
   showTab("profile");
+
+  // Pull latest from Supabase in background and refresh all tabs
+  refreshPlayerFromSupabase(id);
+}
+
+function refreshPlayerFromSupabase(id) {
+  var p = roster.find(function(r){ return r.id === id; });
+  if (!p) return;
+
+  // Pull profile
+  sb.from("player_profiles").select("data").eq("id", id).single().then(function(res) {
+    if (!res.error && res.data && res.data.data) {
+      localStorage.setItem("bdh_dev_profile_" + id, JSON.stringify(res.data.data));
+      if (currentPlayerId === id) loadProfileFields(p);
+    }
+  });
+
+  // Pull skills
+  sb.from("player_skills").select("data").eq("id", id).single().then(function(res) {
+    if (!res.error && res.data && res.data.data) {
+      localStorage.setItem("bdh_player_" + id, JSON.stringify(res.data.data));
+      if (currentPlayerId === id) {
+        var saved = res.data.data;
+        BLOCKS.forEach(function(b){
+          if (saved[b.id]) {
+            b.si.forEach(function(si){
+              if (saved[b.id][si]) state[b.id][si] = saved[b.id][si];
+            });
+          }
+        });
+      }
+    }
+  });
+
+  // Pull physical
+  sb.from("player_physical").select("data").eq("id", id).single().then(function(res) {
+    if (!res.error && res.data && res.data.data) {
+      var d = res.data.data;
+      if (d.physData) {
+        physData = d.physData;
+        localStorage.setItem("bdh_phys_" + id, JSON.stringify(physData));
+      }
+      if (d.coachReads) {
+        coachReads = d.coachReads;
+        localStorage.setItem("bdh_reads_" + id, JSON.stringify(coachReads));
+      }
+      if (d.bodyMeasurements) {
+        bodyMeasurements.forEach(function(m,i){ if(d.bodyMeasurements[i] !== undefined) m.value = d.bodyMeasurements[i]; });
+        localStorage.setItem("bdh_meas_" + id, JSON.stringify(d.bodyMeasurements));
+      }
+      // Rebuild physical tab if currently viewing it
+      if (currentPlayerId === id && document.getElementById("view-physical").style.display !== "none") {
+        physBuilt = false;
+        buildPhysTable();
+        buildBodyMeasurements();
+        renderCoachReadLog();
+      }
+    }
+  });
 }
 
 function resetPlayerState(p) {
@@ -2708,6 +2765,22 @@ function permanentlyDeletePlayer() {
   goToRoster();
 }
 
+function syncAllFromSupabase() {
+  var btn = document.getElementById("sync-btn");
+  if (btn) { btn.textContent = "⏳ Syncing…"; btn.disabled = true; }
+  loadFromSupabase(function() {
+    syncDevProfilesToTeamRoster();
+    // Rebuild whatever screen is currently showing
+    if (document.getElementById("roster-screen").style.display !== "none") buildRosterScreen();
+    if (document.getElementById("teams-screen").style.display !== "none") buildTeamsScreen();
+    if (document.getElementById("player-screen").style.display !== "none") {
+      var p = roster.find(function(r){ return r.id === currentPlayerId; });
+      if (p) { resetPlayerState(p); loadProfileFields(p); physBuilt = false; buildPhysTable(); buildBodyMeasurements(); renderCoachReadLog(); }
+    }
+    if (btn) { btn.textContent = "✓ Synced"; btn.disabled = false; setTimeout(function(){ btn.textContent = "⟳ Sync"; }, 2000); }
+  });
+}
+
 // ─── SEASON SHARE ─────────────────────────────────────────────────────────────
 
 function openSeasonShareModal() {
@@ -3080,10 +3153,9 @@ function saveGameScores(seasonId) {
 
 function loadFromSupabase(callback) {
   var loaded = 0;
-  var total = 5;
+  var total = 8;
   function done() { loaded++; if (loaded >= total) callback(); }
 
-  // Players
   sb.from("players").select("*").then(function(res) {
     if (!res.error && res.data && res.data.length > 0) {
       roster = res.data.map(function(r){ return r.data; });
@@ -3092,7 +3164,6 @@ function loadFromSupabase(callback) {
     done();
   });
 
-  // Teams
   sb.from("teams").select("*").then(function(res) {
     if (!res.error && res.data && res.data.length > 0) {
       teams = res.data.map(function(r){ return r.data; });
@@ -3101,16 +3172,14 @@ function loadFromSupabase(callback) {
     done();
   });
 
-  // Team roster
   sb.from("team_roster").select("*").then(function(res) {
     if (!res.error && res.data && res.data.length > 0) {
       teamRoster = res.data.map(function(r){ return r.data; });
-      saveTeamRoster();
+      localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
     }
     done();
   });
 
-  // Team seasons
   sb.from("team_seasons").select("*").then(function(res) {
     if (!res.error && res.data && res.data.length > 0) {
       res.data.forEach(function(r){ teamSeasons[r.team_id] = r.data; });
@@ -3119,11 +3188,40 @@ function loadFromSupabase(callback) {
     done();
   });
 
-  // Player profiles
   sb.from("player_profiles").select("*").then(function(res) {
-    if (!res.error && res.data) {
+    if (!res.error && res.data && res.data.length > 0) {
       res.data.forEach(function(r){
         localStorage.setItem("bdh_dev_profile_" + r.id, JSON.stringify(r.data));
+      });
+    }
+    done();
+  });
+
+  sb.from("player_skills").select("*").then(function(res) {
+    if (!res.error && res.data && res.data.length > 0) {
+      res.data.forEach(function(r){
+        localStorage.setItem("bdh_player_" + r.id, JSON.stringify(r.data));
+      });
+    }
+    done();
+  });
+
+  sb.from("player_physical").select("*").then(function(res) {
+    if (!res.error && res.data && res.data.length > 0) {
+      res.data.forEach(function(r){
+        var d = r.data;
+        if (d.physData)         localStorage.setItem("bdh_phys_"  + r.id, JSON.stringify(d.physData));
+        if (d.coachReads)       localStorage.setItem("bdh_reads_" + r.id, JSON.stringify(d.coachReads));
+        if (d.bodyMeasurements) localStorage.setItem("bdh_meas_"  + r.id, JSON.stringify(d.bodyMeasurements));
+      });
+    }
+    done();
+  });
+
+  sb.from("game_scores").select("*").then(function(res) {
+    if (!res.error && res.data && res.data.length > 0) {
+      res.data.forEach(function(r){
+        localStorage.setItem("bdh_game_scores_" + r.season_id, JSON.stringify(r.data));
       });
     }
     done();
