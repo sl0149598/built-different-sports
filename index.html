@@ -3156,18 +3156,35 @@ function syncDevProfilesToTeamRoster() {
 syncDevProfilesToTeamRoster();
 showScreen("landing-screen");
 
-// Load latest data from Supabase in background — refreshes on next navigation
-loadFromSupabase(function() {
-  syncDevProfilesToTeamRoster();
-  // Push seed data to Supabase if this is a fresh database
-  sb.from("players").select("id").limit(1).then(function(res) {
-    if (!res.error && res.data && res.data.length === 0) {
-      saveRoster();
-      saveTeams();
-      saveSeasons();
-      saveTeamRoster();
-    }
-  });
+// On startup: check if Supabase has data
+// If empty → push local seed data up
+// If has data → pull it down (overrides local)
+sb.from("players").select("id").limit(1).then(function(res) {
+  if (res.error) {
+    // Supabase unreachable — just use localStorage
+    console.warn("Supabase unavailable, using localStorage");
+    return;
+  }
+
+  if (!res.data || res.data.length === 0) {
+    // Database is empty — push seed data up first
+    saveRoster();
+    saveTeams();
+    saveSeasons();
+    saveTeamRoster();
+    // Also push Taha's profile
+    var tahaProfile = JSON.parse(localStorage.getItem("bdh_dev_profile_taha") || "null");
+    if (tahaProfile) saveDevProfile("taha", tahaProfile);
+    console.log("Seeded Supabase with local data");
+  } else {
+    // Database has data — pull it down
+    loadFromSupabase(function() {
+      syncDevProfilesToTeamRoster();
+      // Rebuild current screen if already on one
+      if (document.getElementById("roster-screen").style.display !== "none") buildRosterScreen();
+      if (document.getElementById("teams-screen").style.display !== "none") buildTeamsScreen();
+    });
+  }
 });
 </script>
 <!-- ADD PLAYER MODAL -->
