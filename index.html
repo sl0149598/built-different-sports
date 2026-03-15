@@ -1234,62 +1234,71 @@ var TEAM_COLORS = [
   {bg:"#F4ECF7",border:"#E8DAEF",text:"#6C3483",dot:"#8E44AD"}
 ];
 
+var roster = JSON.parse(localStorage.getItem("bdh_roster") || "[]");
 var teams = JSON.parse(localStorage.getItem("bdh_teams") || "[]");
 
-// Seed Seahawks if no teams yet
-if (teams.length === 0) {
+function saveTeams() {
+  localStorage.setItem("bdh_teams", JSON.stringify(teams));
+}
+
+// ─── VERSIONED SEED ───────────────────────────────────────────────────────────
+// Bump this version number any time you need to force a fresh seed
+var SEED_VERSION = "2";
+
+if (localStorage.getItem("bdh_seed_version") !== SEED_VERSION) {
   var seahawksId = "team_seahawks";
-  teams.push({
+
+  // Seed Seahawks team
+  teams = [{
     id: seahawksId,
     name: "Seahawks",
     ageGroup: "7th Grade Boys",
     season: "Youth Basketball - Spring 2026",
     notes: "Frisco Fieldhouse — Rec B — Coach: Sam Lawrence",
     colorIdx: 0
-  });
+  }];
   saveTeams();
 
-  // Seed all 8 players linked to the Seahawks team
-  // Only Taha gets a Development tracker link (id: "taha")
-  var teamPlayers = [
-    { id:"taha",            name:"Taha Jirani",     jersey:"12", email:"nabiljirani@hotmail.com",    devId:"taha" },
-    { id:"tp_lesean",       name:"Lesean Kaitei",   jersey:"7",  email:"skaitei@gmail.com",          devId:null },
-    { id:"tp_colby",        name:"Colby Meixner",   jersey:"1",  email:"ksbrown60@yahoo.com",        devId:null },
-    { id:"tp_joseph",       name:"Joseph Olaleye",  jersey:"4",  email:"lanrebillion@gmail.com",     devId:null },
-    { id:"tp_adler",        name:"Adler Onyejeli",  jersey:"11", email:"allison.onyejeli@gmail.com", devId:null },
-    { id:"tp_isaiah",       name:"Isaiah Simmons",  jersey:"23", email:"travisjsimons@gmail.com",    devId:null },
-    { id:"tp_oliver",       name:"Oliver Voss",     jersey:"0",  email:"ambervoss2@gmail.com",       devId:null },
-    { id:"tp_levi",         name:"Levi Wincher",    jersey:"5",  email:"leahsmithn@gmail.com",       devId:null }
+  // Keep any existing Development tracker data for Taha
+  var existingTaha = roster.find(function(r){ return r.id === "taha"; });
+
+  // Rebuild full roster with all 8 Seahawks players
+  var seedPlayers = [
+    { id:"taha",       name:"Taha Jirani",    grade:"7th Grade", position:"C/PF", jersey:"12", email:"nabiljirani@hotmail.com",    program:"8week", devId:"taha",  colorIdx:0 },
+    { id:"tp_lesean",  name:"Lesean Kaitei",  grade:"7th Grade", position:"",     jersey:"7",  email:"skaitei@gmail.com",          program:null,    devId:null,    colorIdx:1 },
+    { id:"tp_colby",   name:"Colby Meixner",  grade:"7th Grade", position:"",     jersey:"1",  email:"ksbrown60@yahoo.com",        program:null,    devId:null,    colorIdx:2 },
+    { id:"tp_joseph",  name:"Joseph Olaleye", grade:"7th Grade", position:"",     jersey:"4",  email:"lanrebillion@gmail.com",     program:null,    devId:null,    colorIdx:3 },
+    { id:"tp_adler",   name:"Adler Onyejeli", grade:"7th Grade", position:"",     jersey:"11", email:"allison.onyejeli@gmail.com", program:null,    devId:null,    colorIdx:4 },
+    { id:"tp_isaiah",  name:"Isaiah Simmons", grade:"7th Grade", position:"",     jersey:"23", email:"travisjsimons@gmail.com",    program:null,    devId:null,    colorIdx:0 },
+    { id:"tp_oliver",  name:"Oliver Voss",    grade:"7th Grade", position:"",     jersey:"0",  email:"ambervoss2@gmail.com",       program:null,    devId:null,    colorIdx:1 },
+    { id:"tp_levi",    name:"Levi Wincher",   grade:"7th Grade", position:"",     jersey:"5",  email:"leahsmithn@gmail.com",       program:null,    devId:null,    colorIdx:2 }
   ];
 
-  teamPlayers.forEach(function(p, i) {
-    // Check if already in roster (Taha)
-    var existing = roster.find(function(r){ return r.id === p.id; });
-    if (existing) {
-      existing.teamId = seahawksId;
-      existing.jersey = p.jersey;
-      existing.email = p.email;
-    } else {
-      roster.push({
-        id: p.id,
-        name: p.name,
-        grade: "7th Grade",
-        position: "",
-        team: "Seahawks",
-        teamId: seahawksId,
-        jersey: p.jersey,
-        email: p.email,
-        program: null,
-        devId: p.devId,
-        colorIdx: i % AVATAR_COLORS.length
-      });
+  roster = seedPlayers.map(function(p) {
+    // Preserve Taha's existing data if he was already set up
+    if (p.id === "taha" && existingTaha) {
+      existingTaha.teamId = seahawksId;
+      existingTaha.jersey = p.jersey;
+      existingTaha.email = p.email;
+      existingTaha.devId = "taha";
+      return existingTaha;
     }
+    return {
+      id: p.id,
+      name: p.name,
+      grade: p.grade,
+      position: p.position,
+      team: "Seahawks",
+      teamId: seahawksId,
+      jersey: p.jersey,
+      email: p.email,
+      program: p.program,
+      devId: p.devId,
+      colorIdx: p.colorIdx
+    };
   });
   saveRoster();
-}
-
-function saveTeams() {
-  localStorage.setItem("bdh_teams", JSON.stringify(teams));
+  localStorage.setItem("bdh_seed_version", SEED_VERSION);
 }
 
 function buildTeamsScreen() {
@@ -1495,23 +1504,6 @@ var AVATAR_COLORS = [
   {bg:"#FDEDEC",border:"#FADBD8",text:"#922B21"},
   {bg:"#F4ECF7",border:"#E8DAEF",text:"#6C3483"}
 ];
-
-// Player roster stored in localStorage
-var roster = JSON.parse(localStorage.getItem("bdh_roster") || "[]");
-
-// If no roster yet, seed Taha as the existing player
-if (roster.length === 0) {
-  roster.push({
-    id: "taha",
-    name: "Taha Ameen Jirani",
-    grade: "7th Grade",
-    position: "C/PF",
-    team: "Seahawks",
-    program: "8week",
-    colorIdx: 0
-  });
-  saveRoster();
-}
 
 var currentPlayerId = null;
 var selectedProgram = null;
