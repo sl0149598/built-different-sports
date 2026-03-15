@@ -138,20 +138,31 @@ body{font-family:system-ui,sans-serif;color:#1a1a1a;background:#0B1F3A url('Buil
   <div style="max-width:960px;margin:0 auto;padding:1.5rem 1rem">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem">
       <button onclick="goToTeams()" style="background:#f0f0f0;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:600;color:#555;font-family:inherit">&#8592; Teams</button>
-      <div style="flex:1">
-        <div id="team-detail-name" style="font-size:22px;font-weight:700;color:#0B1F3A;text-transform:uppercase;letter-spacing:.05em"></div>
-        <div id="team-detail-meta" style="font-size:13px;color:#999;margin-top:2px"></div>
-      </div>
+      <div style="flex:1"></div>
       <button onclick="openEditTeamModal()" style="padding:6px 14px;border:1.5px solid #ddd;border-radius:8px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:#555">&#9998; Edit Team</button>
     </div>
+    <!-- Top level tabs: Team Info | Seasons -->
     <div class="tab-bar" style="margin-bottom:1.5rem">
       <button class="tab active" id="team-tab-info" onclick="showTeamTab('info')">Team Info</button>
-      <button class="tab" id="team-tab-practice" onclick="showTeamTab('practice')">Practice Schedule</button>
-      <button class="tab" id="team-tab-games" onclick="showTeamTab('games')">Game Schedule</button>
+      <button class="tab" id="team-tab-seasons" onclick="showTeamTab('seasons')">Seasons</button>
     </div>
     <div id="team-detail-content"></div>
-    <div id="team-practice-content" style="display:none"></div>
-    <div id="team-games-content" style="display:none"></div>
+    <!-- Seasons list -->
+    <div id="team-seasons-content" style="display:none"></div>
+    <!-- Season detail (practice/games sub-tabs) -->
+    <div id="team-season-detail" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+        <button onclick="showTeamTab('seasons')" style="background:#f0f0f0;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:600;color:#555;font-family:inherit">&#8592; Seasons</button>
+        <div id="season-detail-name" style="font-size:16px;font-weight:700;color:#0B1F3A"></div>
+      </div>
+      <div id="season-info-header"></div>
+      <div class="tab-bar" style="margin-bottom:1.5rem">
+        <button class="tab active" id="season-tab-practice" onclick="showSeasonTab('practice')">Practice Schedule</button>
+        <button class="tab" id="season-tab-games" onclick="showSeasonTab('games')">Game Schedule</button>
+      </div>
+      <div id="team-practice-content"></div>
+      <div id="team-games-content" style="display:none"></div>
+    </div>
   </div>
 </div>
 
@@ -1250,13 +1261,14 @@ function saveTeams() {
 }
 
 // ─── VERSIONED SEED ───────────────────────────────────────────────────────────
-// Bump this version number any time you need to force a fresh seed
-var SEED_VERSION = "3";
+var SEED_VERSION = "5";
+
+// teamRoster = all players on teams (not necessarily in Development)
+var teamRoster = JSON.parse(localStorage.getItem("bdh_team_roster") || "[]");
 
 if (localStorage.getItem("bdh_seed_version") !== SEED_VERSION) {
   var seahawksId = "team_seahawks";
 
-  // Seed Seahawks team
   teams = [{
     id: seahawksId,
     name: "Seahawks",
@@ -1267,49 +1279,45 @@ if (localStorage.getItem("bdh_seed_version") !== SEED_VERSION) {
     coach: "Sam Lawrence",
     practiceTime: "Wednesdays @ 8:00 PM",
     facility: "FieldhouseUSA",
-    notes: "Court 02A for practices",
+    practiceLocation: "Court 02A",
+    notes: "",
     colorIdx: 0
   }];
   saveTeams();
 
-  // Keep any existing Development tracker data for Taha
-  var existingTaha = roster.find(function(r){ return r.id === "taha"; });
-
-  // Rebuild full roster with all 8 Seahawks players
-  var seedPlayers = [
-    { id:"taha",       name:"Taha Jirani",    grade:"7th Grade", position:"C/PF", jersey:"12", email:"nabiljirani@hotmail.com",    program:"8week", devId:"taha",  colorIdx:0 },
-    { id:"tp_lesean",  name:"Lesean Kaitei",  grade:"7th Grade", position:"",     jersey:"7",  email:"skaitei@gmail.com",          program:null,    devId:null,    colorIdx:1 },
-    { id:"tp_colby",   name:"Colby Meixner",  grade:"7th Grade", position:"",     jersey:"1",  email:"ksbrown60@yahoo.com",        program:null,    devId:null,    colorIdx:2 },
-    { id:"tp_joseph",  name:"Joseph Olaleye", grade:"7th Grade", position:"",     jersey:"4",  email:"lanrebillion@gmail.com",     program:null,    devId:null,    colorIdx:3 },
-    { id:"tp_adler",   name:"Adler Onyejeli", grade:"7th Grade", position:"",     jersey:"11", email:"allison.onyejeli@gmail.com", program:null,    devId:null,    colorIdx:4 },
-    { id:"tp_isaiah",  name:"Isaiah Simmons", grade:"7th Grade", position:"",     jersey:"23", email:"travisjsimons@gmail.com",    program:null,    devId:null,    colorIdx:0 },
-    { id:"tp_oliver",  name:"Oliver Voss",    grade:"7th Grade", position:"",     jersey:"0",  email:"ambervoss2@gmail.com",       program:null,    devId:null,    colorIdx:1 },
-    { id:"tp_levi",    name:"Levi Wincher",   grade:"7th Grade", position:"",     jersey:"5",  email:"leahsmithn@gmail.com",       program:null,    devId:null,    colorIdx:2 }
+  // Full Seahawks team roster — stored separately from Development
+  teamRoster = [
+    { id:"taha",       name:"Taha Jirani",    grade:"7th Grade", position:"C/PF", jersey:"12", email:"nabiljirani@hotmail.com",    teamId:seahawksId, devId:"taha", colorIdx:0 },
+    { id:"tp_lesean",  name:"Lesean Kaitei",  grade:"7th Grade", position:"",     jersey:"7",  email:"skaitei@gmail.com",          teamId:seahawksId, devId:null,   colorIdx:1 },
+    { id:"tp_colby",   name:"Colby Meixner",  grade:"7th Grade", position:"",     jersey:"1",  email:"ksbrown60@yahoo.com",        teamId:seahawksId, devId:null,   colorIdx:2 },
+    { id:"tp_joseph",  name:"Joseph Olaleye", grade:"7th Grade", position:"",     jersey:"4",  email:"lanrebillion@gmail.com",     teamId:seahawksId, devId:null,   colorIdx:3 },
+    { id:"tp_adler",   name:"Adler Onyejeli", grade:"7th Grade", position:"",     jersey:"11", email:"allison.onyejeli@gmail.com", teamId:seahawksId, devId:null,   colorIdx:4 },
+    { id:"tp_isaiah",  name:"Isaiah Simmons", grade:"7th Grade", position:"",     jersey:"23", email:"travisjsimons@gmail.com",    teamId:seahawksId, devId:null,   colorIdx:0 },
+    { id:"tp_oliver",  name:"Oliver Voss",    grade:"7th Grade", position:"",     jersey:"0",  email:"ambervoss2@gmail.com",       teamId:seahawksId, devId:null,   colorIdx:1 },
+    { id:"tp_levi",    name:"Levi Wincher",   grade:"7th Grade", position:"",     jersey:"5",  email:"leahsmithn@gmail.com",       teamId:seahawksId, devId:null,   colorIdx:2 }
   ];
+  localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
 
-  roster = seedPlayers.map(function(p) {
-    // Preserve Taha's existing data if he was already set up
-    if (p.id === "taha" && existingTaha) {
-      existingTaha.teamId = seahawksId;
-      existingTaha.jersey = p.jersey;
-      existingTaha.email = p.email;
-      existingTaha.devId = "taha";
-      return existingTaha;
-    }
-    return {
-      id: p.id,
-      name: p.name,
-      grade: p.grade,
-      position: p.position,
-      team: "Seahawks",
-      teamId: seahawksId,
-      jersey: p.jersey,
-      email: p.email,
-      program: p.program,
-      devId: p.devId,
-      colorIdx: p.colorIdx
-    };
-  });
+  // Development roster — ONLY Taha
+  var existingTaha = roster.find(function(r){ return r.id === "taha"; });
+  roster = [existingTaha || {
+    id: "taha",
+    name: "Taha Jirani",
+    grade: "7th Grade",
+    position: "C/PF",
+    team: "Seahawks",
+    teamId: seahawksId,
+    jersey: "12",
+    email: "nabiljirani@hotmail.com",
+    program: "8week",
+    devId: "taha",
+    colorIdx: 0
+  }];
+  if (roster[0]) {
+    roster[0].teamId = seahawksId;
+    roster[0].jersey = "12";
+    roster[0].devId = "taha";
+  }
   saveRoster();
   localStorage.setItem("bdh_seed_version", SEED_VERSION);
 }
@@ -1320,7 +1328,7 @@ function buildTeamsScreen() {
 
   teams.forEach(function(t) {
     var col = TEAM_COLORS[t.colorIdx % TEAM_COLORS.length];
-    var playerCount = roster.filter(function(p){ return p.teamId === t.id; }).length;
+    var playerCount = teamRoster.filter(function(p){ return p.teamId === t.id; }).length;
     var card = document.createElement("div");
     card.className = "team-card";
     card.onclick = function(){ openTeamDetail(t.id); };
@@ -1355,19 +1363,14 @@ function openTeamDetail(id) {
   document.getElementById("team-detail-meta").textContent = (t.ageGroup||"") + (t.season?" · "+t.season:"") + (t.notes?" · "+t.notes:"");
   buildTeamDetailContent(t);
   showScreen("team-detail-screen");
-
-  // Reset tabs to Team Info
-  var pc = document.getElementById("team-practice-content");
-  var gc = document.getElementById("team-games-content");
-  if (pc) { pc.dataset.built = ""; pc.innerHTML = ""; }
-  if (gc) { gc.dataset.built = ""; gc.innerHTML = ""; }
+  currentSeasonId = null;
   showTeamTab("info");
 }
 
 function buildTeamDetailContent(t) {
   var cont = document.getElementById("team-detail-content");
   cont.innerHTML = "";
-  var teamPlayers = roster.filter(function(p){ return p.teamId === t.id; });
+  var teamPlayers = teamRoster.filter(function(p){ return p.teamId === t.id; });
 
   // Team info card
   var col = TEAM_COLORS[t.colorIdx % TEAM_COLORS.length];
@@ -1376,13 +1379,7 @@ function buildTeamDetailContent(t) {
   info.innerHTML = "<div class='section-head' style='text-transform:uppercase;font-weight:700;letter-spacing:.04em'>Team Info</div>" +
     "<div class='field-grid three'>" +
       "<div class='field'><label>Team Name</label><span class='field-val'>" + t.name + "</span></div>" +
-      "<div class='field'><label>Age Group / Grade</label><span class='field-val'>" + (t.ageGroup||"—") + "</span></div>" +
-      "<div class='field'><label>Season</label><span class='field-val'>" + (t.season||"—") + "</span></div>" +
-      "<div class='field'><label>League</label><span class='field-val'>" + (t.league||"—") + "</span></div>" +
-      "<div class='field'><label>Division</label><span class='field-val'>" + (t.division||"—") + "</span></div>" +
       "<div class='field'><label>Head Coach</label><span class='field-val'>" + (t.coach||"—") + "</span></div>" +
-      "<div class='field'><label>Practice Day & Time</label><span class='field-val'>" + (t.practiceTime||"—") + "</span></div>" +
-      "<div class='field'><label>Facility</label><span class='field-val'>" + (t.facility||"—") + "</span></div>" +
     "</div>" +
     (t.notes ? "<div class='divider'></div><div style='font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;font-weight:500'>Notes</div><p style='font-size:14px'>" + t.notes + "</p>" : "");
   cont.appendChild(info);
@@ -1433,129 +1430,257 @@ function buildTeamDetailContent(t) {
   cont.appendChild(rosterCard);
 }
 
-// ─── TEAM SCHEDULES ───────────────────────────────────────────────────────────
+// ─── SEASONS ──────────────────────────────────────────────────────────────────
 
-var SEAHAWKS_PRACTICES = [
-  { date:"Wed, Mar 4, 2026",  time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
-  { date:"Wed, Mar 11, 2026", time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
-  { date:"Wed, Mar 18, 2026", time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
-  { date:"Wed, Apr 1, 2026",  time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
-  { date:"Wed, Apr 8, 2026",  time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
-  { date:"Wed, Apr 22, 2026", time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
-  { date:"Wed, Apr 29, 2026", time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
-  { date:"Wed, May 6, 2026",  time:"8:00 PM", location:"FieldhouseUSA / Court 02A" }
-];
+var teamSeasons = JSON.parse(localStorage.getItem("bdh_team_seasons") || "{}");
 
-var SEAHAWKS_GAMES = [
-  { date:"Sat, Mar 7, 2026",  time:"12:00 PM", visitor:"Seahawks (Lawrence)",       home:"D1 Gold (Eaton)",              location:"Court 08", seahawks:"37", opponent_score:"22", score:"W 37–22", result:"W" },
-  { date:"Fri, Mar 13, 2026", time:"8:00 PM",  visitor:"Tarhorns 7B (Boles)",       home:"Seahawks (Lawrence)",          location:"Court 03", seahawks:"36", opponent_score:"27", score:"W 36–27", result:"W" },
-  { date:"Sat, Mar 21, 2026", time:"6:00 PM",  visitor:"Seahawks (Lawrence)",       home:"Tarhorns 7B (Boles)",          location:"Court 08", seahawks:"",   opponent_score:"",   score:"",        result:"" },
-  { date:"Fri, Mar 27, 2026", time:"9:00 PM",  visitor:"NTX Kings",                 home:"Seahawks (Lawrence)",          location:"Court 01", seahawks:"",   opponent_score:"",   score:"",        result:"" },
-  { date:"Sun, Apr 12, 2026", time:"4:00 PM",  visitor:"Mavericks (Leigh)",         home:"Seahawks (Lawrence)",          location:"Court 08", seahawks:"",   opponent_score:"",   score:"",        result:"" },
-  { date:"Sun, Apr 26, 2026", time:"4:00 PM",  visitor:"Seahawks (Lawrence)",       home:"Dream Team Elite (Kovalsky)",  location:"Court 08", seahawks:"",   opponent_score:"",   score:"",        result:"" },
-  { date:"Sat, May 2, 2026",  time:"12:00 PM", visitor:"Seahawks (Lawrence)",       home:"Prosper Elite Blue (Dawson)",  location:"Court 08", seahawks:"",   opponent_score:"",   score:"",        result:"" },
-  { date:"Sat, May 9, 2026",  time:"12:00 PM", visitor:"D1 Gold (Eaton)",           home:"Seahawks (Lawrence)",          location:"Court 08", seahawks:"",   opponent_score:"",   score:"",        result:"" }
-];
+function saveSeasons() {
+  localStorage.setItem("bdh_team_seasons", JSON.stringify(teamSeasons));
+}
+
+if (!teamSeasons["team_seahawks"] || teamSeasons["team_seahawks"].length === 0) {
+  teamSeasons["team_seahawks"] = [{
+    id: "season_seahawks_s26",
+    name: "Spring 2026",
+    practices: [
+      { date:"Wed, Mar 4, 2026",  time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
+      { date:"Wed, Mar 11, 2026", time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
+      { date:"Wed, Mar 18, 2026", time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
+      { date:"Wed, Apr 1, 2026",  time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
+      { date:"Wed, Apr 8, 2026",  time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
+      { date:"Wed, Apr 22, 2026", time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
+      { date:"Wed, Apr 29, 2026", time:"8:00 PM", location:"FieldhouseUSA / Court 02A" },
+      { date:"Wed, May 6, 2026",  time:"8:00 PM", location:"FieldhouseUSA / Court 02A" }
+    ],
+    games: [
+      { date:"Sat, Mar 7, 2026",  time:"12:00 PM", visitor:"Seahawks (Lawrence)",      home:"D1 Gold (Eaton)",             location:"Court 08", seahawks:"37", opponent_score:"22", result:"W" },
+      { date:"Fri, Mar 13, 2026", time:"8:00 PM",  visitor:"Tarhorns 7B (Boles)",      home:"Seahawks (Lawrence)",         location:"Court 03", seahawks:"36", opponent_score:"27", result:"W" },
+      { date:"Sat, Mar 21, 2026", time:"6:00 PM",  visitor:"Seahawks (Lawrence)",      home:"Tarhorns 7B (Boles)",         location:"Court 08", seahawks:"",   opponent_score:"",   result:"" },
+      { date:"Fri, Mar 27, 2026", time:"9:00 PM",  visitor:"NTX Kings",                home:"Seahawks (Lawrence)",         location:"Court 01", seahawks:"",   opponent_score:"",   result:"" },
+      { date:"Sun, Apr 12, 2026", time:"4:00 PM",  visitor:"Mavericks (Leigh)",        home:"Seahawks (Lawrence)",         location:"Court 08", seahawks:"",   opponent_score:"",   result:"" },
+      { date:"Sun, Apr 26, 2026", time:"4:00 PM",  visitor:"Seahawks (Lawrence)",      home:"Dream Team Elite (Kovalsky)", location:"Court 08", seahawks:"",   opponent_score:"",   result:"" },
+      { date:"Sat, May 2, 2026",  time:"12:00 PM", visitor:"Seahawks (Lawrence)",      home:"Prosper Elite Blue (Dawson)", location:"Court 08", seahawks:"",   opponent_score:"",   result:"" },
+      { date:"Sat, May 9, 2026",  time:"12:00 PM", visitor:"D1 Gold (Eaton)",          home:"Seahawks (Lawrence)",         location:"Court 08", seahawks:"",   opponent_score:"",   result:"" }
+    ]
+  }];
+  saveSeasons();
+}
+
+var currentSeasonId = null;
 
 function showTeamTab(tab) {
-  ["info","practice","games"].forEach(function(t) {
-    document.getElementById("team-tab-" + t).classList.toggle("active", t === tab);
-    var content = t === "info" ? "team-detail-content" : t === "practice" ? "team-practice-content" : "team-games-content";
-    document.getElementById(content).style.display = t === tab ? "block" : "none";
+  ["info","seasons"].forEach(function(t) {
+    var btn = document.getElementById("team-tab-" + t);
+    if (btn) btn.classList.toggle("active", t === tab);
   });
+  document.getElementById("team-detail-content").style.display  = tab === "info"    ? "block" : "none";
+  document.getElementById("team-seasons-content").style.display = tab === "seasons" ? "block" : "none";
+  document.getElementById("team-season-detail").style.display   = "none";
+  if (tab === "seasons") buildSeasonsScreen();
+}
+
+function showSeasonTab(tab) {
+  ["practice","games"].forEach(function(t) {
+    document.getElementById("season-tab-" + t).classList.toggle("active", t === tab);
+  });
+  document.getElementById("team-practice-content").style.display = tab === "practice" ? "block" : "none";
+  document.getElementById("team-games-content").style.display    = tab === "games"    ? "block" : "none";
   if (tab === "practice") buildPracticeSchedule();
-  if (tab === "games") buildGameSchedule();
+  if (tab === "games")    buildGameSchedule();
+}
+
+function buildSeasonsScreen() {
+  var cont = document.getElementById("team-seasons-content");
+  cont.innerHTML = "";
+  var seasons = teamSeasons[currentTeamId] || [];
+  var card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = "<div class='section-head' style='text-transform:uppercase;font-weight:700;letter-spacing:.04em'>Seasons <span style='font-size:12px;font-weight:400;color:#999;text-transform:none;letter-spacing:0'>" + seasons.length + " season" + (seasons.length !== 1 ? "s" : "") + "</span></div>";
+
+  if (seasons.length === 0) {
+    card.innerHTML += "<div style='text-align:center;padding:2rem;color:#bbb;font-size:13px'>No seasons yet. Add your first season below.</div>";
+  } else {
+    seasons.forEach(function(s) {
+      var wins   = s.games.filter(function(g){ return g.result === "W"; }).length;
+      var losses = s.games.filter(function(g){ return g.result === "L"; }).length;
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f0f0f0;cursor:pointer";
+      row.onmouseover = function(){ this.style.background="#fafafa"; };
+      row.onmouseout  = function(){ this.style.background="transparent"; };
+      row.onclick     = function(){ openSeasonDetail(s.id); };
+      row.innerHTML =
+        "<div style='width:44px;height:44px;border-radius:10px;background:#EBF5FB;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0'>&#128197;</div>" +
+        "<div style='flex:1'>" +
+          "<div style='font-size:15px;font-weight:600;color:#0B1F3A'>" + s.name + "</div>" +
+          "<div style='font-size:12px;color:#999;margin-top:2px'>" + s.practices.length + " practices &nbsp;&middot;&nbsp; " + s.games.length + " games" +
+          (wins || losses ? " &nbsp;&middot;&nbsp; <span style='color:#1E8449;font-weight:600'>" + wins + "W</span> &ndash; <span style='color:#E24B4A;font-weight:600'>" + losses + "L</span>" : "") + "</div>" +
+        "</div>" +
+        "<div style='color:#ccc;font-size:18px'>&#8250;</div>";
+      card.appendChild(row);
+    });
+  }
+
+  var addBtn = document.createElement("button");
+  addBtn.style.cssText = "margin-top:.75rem;padding:8px 16px;border:1.5px dashed #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;color:#999;width:100%";
+  addBtn.textContent = "+ Add New Season";
+  addBtn.onmouseover = function(){ this.style.borderColor="#0B1F3A"; this.style.color="#0B1F3A"; };
+  addBtn.onmouseout  = function(){ this.style.borderColor="#ddd"; this.style.color="#999"; };
+  addBtn.onclick = function(){ openAddSeasonModal(); };
+  card.appendChild(addBtn);
+  cont.appendChild(card);
+}
+
+function openSeasonDetail(seasonId) {
+  currentSeasonId = seasonId;
+  var seasons = teamSeasons[currentTeamId] || [];
+  var s = seasons.find(function(x){ return x.id === seasonId; });
+  if (!s) return;
+  var t = teams.find(function(x){ return x.id === currentTeamId; });
+
+  document.getElementById("season-detail-name").textContent = s.name;
+
+  // Build season info header card
+  var infoWrap = document.getElementById("season-info-header");
+  if (infoWrap) {
+    infoWrap.innerHTML = "";
+    var card = document.createElement("div");
+    card.className = "card";
+    card.style.marginBottom = "1rem";
+    card.innerHTML = "<div class='section-head' style='text-transform:uppercase;font-weight:700;letter-spacing:.04em'>" + s.name +
+      "<span style='font-size:12px;font-weight:400;color:#999;text-transform:none;letter-spacing:0;margin-left:8px'>" + (t ? t.name : "") + "</span></div>" +
+      "<div class='field-grid three'>" +
+        "<div class='field'><label>Age Group / Grade</label><span class='field-val'>" + (t && t.ageGroup ? t.ageGroup : "—") + "</span></div>" +
+        "<div class='field'><label>League</label><span class='field-val'>" + (t && t.league ? t.league : "—") + "</span></div>" +
+        "<div class='field'><label>Division</label><span class='field-val'>" + (t && t.division ? t.division : "—") + "</span></div>" +
+        "<div class='field'><label>Practice Day & Time</label><span class='field-val'>" + (t && t.practiceTime ? t.practiceTime : "—") + "</span></div>" +
+        "<div class='field'><label>Facility</label><span class='field-val'>" + (t && t.facility ? t.facility : "—") + "</span></div>" +
+        "<div class='field'><label>Practice Court</label><span class='field-val'>" + (t && t.practiceLocation ? t.practiceLocation : "—") + "</span></div>" +
+      "</div>";
+    infoWrap.appendChild(card);
+  }
+
+  document.getElementById("team-seasons-content").style.display = "none";
+  document.getElementById("team-season-detail").style.display   = "block";
+  document.getElementById("team-practice-content").innerHTML = "";
+  document.getElementById("team-games-content").innerHTML = "";
+  document.getElementById("season-tab-practice").classList.add("active");
+  document.getElementById("season-tab-games").classList.remove("active");
+  document.getElementById("team-practice-content").style.display = "block";
+  document.getElementById("team-games-content").style.display = "none";
+  buildPracticeSchedule();
+}
+
+function openAddSeasonModal() {
+  document.getElementById("season-name-inp").value = "";
+  document.getElementById("add-season-modal").style.display = "flex";
+}
+
+function closeAddSeasonModal() {
+  document.getElementById("add-season-modal").style.display = "none";
+}
+
+function saveNewSeason() {
+  var name = document.getElementById("season-name-inp").value.trim();
+  if (!name) { alert("Please enter a season name."); return; }
+  if (!teamSeasons[currentTeamId]) teamSeasons[currentTeamId] = [];
+  teamSeasons[currentTeamId].push({
+    id: "season_" + currentTeamId + "_" + Date.now(),
+    name: name,
+    practices: [],
+    games: []
+  });
+  saveSeasons();
+  closeAddSeasonModal();
+  buildSeasonsScreen();
 }
 
 function buildPracticeSchedule() {
   var cont = document.getElementById("team-practice-content");
-  if (cont.dataset.built) return;
-  cont.dataset.built = "1";
+  cont.innerHTML = "";
+  var seasons = teamSeasons[currentTeamId] || [];
+  var season = seasons.find(function(s){ return s.id === currentSeasonId; });
+  if (!season) return;
+  var practices = season.practices;
   var today = new Date();
-
+  var t = teams.find(function(x){ return x.id === currentTeamId; });
+  var subtitle = t ? (t.practiceTime || "") + (t.practiceLocation ? " &middot; " + t.facility + " / " + t.practiceLocation : "") : "";
   var card = document.createElement("div");
   card.className = "card";
-  card.innerHTML = "<div class='section-head' style='text-transform:uppercase;font-weight:700;letter-spacing:.04em'>Practice Schedule <span style='font-size:12px;font-weight:400;color:#999;text-transform:none;letter-spacing:0'>FieldhouseUSA · Wednesdays @ 8:00 PM</span></div>";
-
-  SEAHAWKS_PRACTICES.forEach(function(p) {
-    var practiceDate = new Date(p.date);
-    var isPast = practiceDate < today;
-    var isNext = !isPast && SEAHAWKS_PRACTICES.filter(function(x){ return new Date(x.date) >= today; })[0] === p;
-
-    var row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f0f0f0";
-    row.innerHTML =
-      "<div style='width:44px;height:44px;border-radius:10px;background:" + (isPast?"#f5f5f5":isNext?"#EBF5FB":"#EAFAF1") + ";display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0'>" +
-        "<div style='font-size:10px;font-weight:600;color:" + (isPast?"#bbb":isNext?"#1A5276":"#1E8449") + ";text-transform:uppercase'>" + p.date.split(", ")[1].split(" ")[0] + "</div>" +
-        "<div style='font-size:16px;font-weight:700;color:" + (isPast?"#bbb":isNext?"#1A5276":"#1E8449") + ";line-height:1'>" + p.date.split(" ")[2].replace(",","") + "</div>" +
-      "</div>" +
-      "<div style='flex:1'>" +
-        "<div style='font-size:14px;font-weight:600;color:" + (isPast?"#999":"#0B1F3A") + "'>" + p.date + "</div>" +
-        "<div style='font-size:12px;color:#999;margin-top:2px'>&#128337; " + p.time + " &nbsp;&nbsp; &#128205; " + p.location + "</div>" +
-      "</div>" +
-      (isNext ? "<span style='font-size:10px;font-weight:600;padding:3px 9px;border-radius:10px;background:#EAFAF1;color:#1E8449'>Next</span>" :
-       isPast ? "<span style='font-size:10px;font-weight:500;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#bbb'>Done</span>" :
-       "<span style='font-size:10px;font-weight:500;padding:3px 9px;border-radius:10px;background:#FEF9E7;color:#7D6608'>Upcoming</span>");
-    card.appendChild(row);
-  });
+  card.innerHTML = "<div class='section-head' style='text-transform:uppercase;font-weight:700;letter-spacing:.04em'>Practice Schedule <span style='font-size:12px;font-weight:400;color:#999;text-transform:none;letter-spacing:0'>" + subtitle + "</span></div>";
+  if (practices.length === 0) {
+    card.innerHTML += "<div style='text-align:center;padding:2rem;color:#bbb;font-size:13px'>No practices scheduled yet.</div>";
+  } else {
+    practices.forEach(function(p) {
+      var practiceDate = new Date(p.date);
+      var isPast = practiceDate < today;
+      var upcoming = practices.filter(function(x){ return new Date(x.date) >= today; });
+      var isNext = upcoming.length > 0 && upcoming[0] === p;
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f0f0f0";
+      row.innerHTML =
+        "<div style='width:44px;height:44px;border-radius:10px;background:" + (isPast?"#f5f5f5":isNext?"#EBF5FB":"#EAFAF1") + ";display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0'>" +
+          "<div style='font-size:10px;font-weight:600;color:" + (isPast?"#bbb":isNext?"#1A5276":"#1E8449") + ";text-transform:uppercase'>" + p.date.split(", ")[1].split(" ")[0] + "</div>" +
+          "<div style='font-size:16px;font-weight:700;color:" + (isPast?"#bbb":isNext?"#1A5276":"#1E8449") + ";line-height:1'>" + p.date.split(" ")[2].replace(",","") + "</div>" +
+        "</div>" +
+        "<div style='flex:1'>" +
+          "<div style='font-size:14px;font-weight:600;color:" + (isPast?"#999":"#0B1F3A") + "'>" + p.date + "</div>" +
+          "<div style='font-size:12px;color:#999;margin-top:2px'>&#128337; " + p.time + " &nbsp;&nbsp; &#128205; " + p.location + "</div>" +
+        "</div>" +
+        (isNext ? "<span style='font-size:10px;font-weight:600;padding:3px 9px;border-radius:10px;background:#EAFAF1;color:#1E8449'>Next</span>" :
+         isPast ? "<span style='font-size:10px;font-weight:500;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#bbb'>Done</span>" :
+         "<span style='font-size:10px;font-weight:500;padding:3px 9px;border-radius:10px;background:#FEF9E7;color:#7D6608'>Upcoming</span>");
+      card.appendChild(row);
+    });
+  }
   cont.appendChild(card);
 }
 
 function loadGameScores() {
-  var saved = JSON.parse(localStorage.getItem("bdh_game_scores") || "{}");
-  SEAHAWKS_GAMES.forEach(function(g, i) {
+  var saved = JSON.parse(localStorage.getItem("bdh_game_scores_" + currentSeasonId) || "{}");
+  var seasons = teamSeasons[currentTeamId] || [];
+  var season = seasons.find(function(s){ return s.id === currentSeasonId; });
+  if (!season) return;
+  season.games.forEach(function(g, i) {
     if (saved[i]) {
-      g.seahawks = saved[i].seahawks || g.seahawks || "";
-      g.opponent_score = saved[i].opponent_score || g.opponent_score || "";
-      g.result = saved[i].result || g.result || "";
-      g.score = saved[i].score || g.score || "";
+      g.seahawks       = saved[i].seahawks       !== undefined ? saved[i].seahawks       : g.seahawks;
+      g.opponent_score = saved[i].opponent_score !== undefined ? saved[i].opponent_score : g.opponent_score;
+      g.result         = saved[i].result         !== undefined ? saved[i].result         : g.result;
     }
   });
 }
 
 function saveGameScore(idx) {
-  var sInp = document.getElementById("score-us-" + idx);
+  var sInp = document.getElementById("score-us-"   + idx);
   var oInp = document.getElementById("score-them-" + idx);
   if (!sInp || !oInp) return;
-  var us = sInp.value.trim();
-  var them = oInp.value.trim();
-  var g = SEAHAWKS_GAMES[idx];
-
+  var us = sInp.value.trim(), them = oInp.value.trim();
+  var seasons = teamSeasons[currentTeamId] || [];
+  var season  = seasons.find(function(s){ return s.id === currentSeasonId; });
+  if (!season) return;
+  var g = season.games[idx];
+  if (!g) return;
   if (us !== "" && them !== "") {
     var usN = parseInt(us), themN = parseInt(them);
-    g.seahawks = us;
-    g.opponent_score = them;
+    g.seahawks = us; g.opponent_score = them;
     g.result = usN > themN ? "W" : usN < themN ? "L" : "T";
-    var isHome = g.home.includes("Seahawks");
-    g.score = isHome
-      ? (g.result === "W" ? "W " : g.result === "L" ? "L " : "T ") + usN + "–" + themN
-      : (g.result === "W" ? "W " : g.result === "L" ? "L " : "T ") + usN + "–" + themN;
   } else {
-    g.seahawks = us;
-    g.opponent_score = them;
-    g.result = "";
-    g.score = "";
+    g.seahawks = us; g.opponent_score = them; g.result = "";
   }
-
-  var saved = JSON.parse(localStorage.getItem("bdh_game_scores") || "{}");
-  saved[idx] = { seahawks: g.seahawks, opponent_score: g.opponent_score, result: g.result, score: g.score };
-  localStorage.setItem("bdh_game_scores", JSON.stringify(saved));
-
-  // Refresh record counts
-  var wins = SEAHAWKS_GAMES.filter(function(x){ return x.result === "W"; }).length;
-  var losses = SEAHAWKS_GAMES.filter(function(x){ return x.result === "L"; }).length;
+  var saved = JSON.parse(localStorage.getItem("bdh_game_scores_" + currentSeasonId) || "{}");
+  saved[idx] = { seahawks: g.seahawks, opponent_score: g.opponent_score, result: g.result };
+  localStorage.setItem("bdh_game_scores_" + currentSeasonId, JSON.stringify(saved));
+  var wins = season.games.filter(function(x){ return x.result === "W"; }).length;
+  var losses = season.games.filter(function(x){ return x.result === "L"; }).length;
   var wEl = document.getElementById("record-wins");
   var lEl = document.getElementById("record-losses");
   if (wEl) wEl.textContent = wins;
   if (lEl) lEl.textContent = losses;
-
-  // Update result badge color
   var badge = document.getElementById("result-badge-" + idx);
   if (badge) {
-    if (g.result === "W") { badge.style.background="#EAFAF1"; badge.style.color="#1E8449"; badge.textContent = "W"; }
-    else if (g.result === "L") { badge.style.background="#FCEBEB"; badge.style.color="#E24B4A"; badge.textContent = "L"; }
-    else if (g.result === "T") { badge.style.background="#EBF5FB"; badge.style.color="#1A5276"; badge.textContent = "T"; }
-    else { badge.style.background="#FEF9E7"; badge.style.color="#7D6608"; badge.textContent = "—"; }
+    if (g.result === "W")      { badge.style.background="#EAFAF1"; badge.style.color="#1E8449"; badge.textContent="W"; }
+    else if (g.result === "L") { badge.style.background="#FCEBEB"; badge.style.color="#E24B4A"; badge.textContent="L"; }
+    else if (g.result === "T") { badge.style.background="#EBF5FB"; badge.style.color="#1A5276"; badge.textContent="T"; }
+    else                       { badge.style.background="#FEF9E7"; badge.style.color="#7D6608"; badge.textContent="\u2014"; }
   }
 }
 
@@ -1563,14 +1688,15 @@ function buildGameSchedule() {
   loadGameScores();
   var cont = document.getElementById("team-games-content");
   cont.innerHTML = "";
-
-  var wins = SEAHAWKS_GAMES.filter(function(g){ return g.result === "W"; }).length;
-  var losses = SEAHAWKS_GAMES.filter(function(g){ return g.result === "L"; }).length;
-
+  var seasons = teamSeasons[currentTeamId] || [];
+  var season  = seasons.find(function(s){ return s.id === currentSeasonId; });
+  if (!season) return;
+  var games = season.games;
+  var wins   = games.filter(function(g){ return g.result === "W"; }).length;
+  var losses = games.filter(function(g){ return g.result === "L"; }).length;
   var card = document.createElement("div");
   card.className = "card";
-  card.innerHTML = "<div class='section-head' style='text-transform:uppercase;font-weight:700;letter-spacing:.04em'>Game Schedule " +
-    "<span style='font-size:12px;font-weight:400;color:#999;text-transform:none;letter-spacing:0'>FieldhouseUSA · Rec B</span></div>" +
+  card.innerHTML = "<div class='section-head' style='text-transform:uppercase;font-weight:700;letter-spacing:.04em'>Game Schedule</div>" +
     "<div style='display:flex;gap:16px;margin-bottom:1rem'>" +
       "<div style='text-align:center;padding:.5rem 1.25rem;background:#EAFAF1;border-radius:8px;border:1px solid #D5F5E3'>" +
         "<div id='record-wins' style='font-size:22px;font-weight:700;color:#1E8449'>" + wins + "</div>" +
@@ -1581,82 +1707,58 @@ function buildGameSchedule() {
         "<div style='font-size:11px;color:#E24B4A;font-weight:600;text-transform:uppercase;letter-spacing:.05em'>Losses</div>" +
       "</div>" +
     "</div>";
-
-  var today = new Date();
-  SEAHAWKS_GAMES.forEach(function(g, idx) {
-    var gameDate = new Date(g.date);
-    var isPast = gameDate < today;
-    var isSeahawksHome = g.home.includes("Seahawks");
-    var opponent = isSeahawksHome ? g.visitor : g.home;
-    var homeAway = isSeahawksHome ? "HOME" : "AWAY";
-    var homeAwayColor = isSeahawksHome ? "#1A5276" : "#7D6608";
-    var homeAwayBg = isSeahawksHome ? "#EBF5FB" : "#FEF9E7";
-
-    var row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f0f0f0;flex-wrap:wrap";
-
-    // Date tile
-    var dateTile = document.createElement("div");
-    dateTile.style.cssText = "width:44px;height:44px;border-radius:10px;background:#f5f5f5;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0";
-    dateTile.innerHTML = "<div style='font-size:9px;font-weight:600;color:#999;text-transform:uppercase'>" + g.date.split(", ")[1].split(" ")[0] + "</div>" +
-      "<div style='font-size:15px;font-weight:700;color:#0B1F3A;line-height:1'>" + g.date.split(" ")[2].replace(",","") + "</div>";
-
-    // Game info
-    var info = document.createElement("div");
-    info.style.cssText = "flex:1;min-width:0";
-    info.innerHTML = "<div style='display:flex;align-items:center;gap:6px;margin-bottom:2px'>" +
-      "<span style='font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:" + homeAwayBg + ";color:" + homeAwayColor + "'>" + homeAway + "</span>" +
-      "<span style='font-size:14px;font-weight:600;color:#0B1F3A'>" + opponent + "</span>" +
-      "</div>" +
-      "<div style='font-size:11px;color:#999'>&#128337; " + g.time + " &nbsp; &#128205; FieldhouseUSA / " + g.location + "</div>";
-
-    // Score inputs
-    var scoreWrap = document.createElement("div");
-    scoreWrap.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0";
-
-    // Result badge
-    var badge = document.createElement("div");
-    badge.id = "result-badge-" + idx;
-    badge.style.cssText = "width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0";
-    if (g.result === "W") { badge.style.background="#EAFAF1"; badge.style.color="#1E8449"; badge.textContent="W"; }
-    else if (g.result === "L") { badge.style.background="#FCEBEB"; badge.style.color="#E24B4A"; badge.textContent="L"; }
-    else if (g.result === "T") { badge.style.background="#EBF5FB"; badge.style.color="#1A5276"; badge.textContent="T"; }
-    else { badge.style.background="#FEF9E7"; badge.style.color="#7D6608"; badge.textContent="—"; }
-
-    var usInp = document.createElement("input");
-    usInp.id = "score-us-" + idx;
-    usInp.type = "number";
-    usInp.min = "0";
-    usInp.placeholder = "Us";
-    usInp.value = g.seahawks || "";
-    usInp.style.cssText = "width:48px;text-align:center;border:1.5px solid #ddd;border-radius:6px;padding:4px 6px;font-size:13px;font-weight:600;font-family:inherit;outline:none;color:#0B1F3A";
-    usInp.onfocus = function(){ this.style.borderColor="#0B1F3A"; };
-    usInp.onblur = function(){ this.style.borderColor="#ddd"; saveGameScore(idx); };
-
-    var dash = document.createElement("span");
-    dash.style.cssText = "font-size:13px;color:#ccc;font-weight:600";
-    dash.textContent = "–";
-
-    var themInp = document.createElement("input");
-    themInp.id = "score-them-" + idx;
-    themInp.type = "number";
-    themInp.min = "0";
-    themInp.placeholder = "Them";
-    themInp.value = g.opponent_score || "";
-    themInp.style.cssText = "width:48px;text-align:center;border:1.5px solid #ddd;border-radius:6px;padding:4px 6px;font-size:13px;font-weight:600;font-family:inherit;outline:none;color:#666";
-    themInp.onfocus = function(){ this.style.borderColor="#0B1F3A"; };
-    themInp.onblur = function(){ this.style.borderColor="#ddd"; saveGameScore(idx); };
-
-    scoreWrap.appendChild(badge);
-    scoreWrap.appendChild(usInp);
-    scoreWrap.appendChild(dash);
-    scoreWrap.appendChild(themInp);
-
-    row.appendChild(dateTile);
-    row.appendChild(info);
-    row.appendChild(scoreWrap);
-    card.appendChild(row);
-  });
+  if (games.length === 0) {
+    card.innerHTML += "<div style='text-align:center;padding:2rem;color:#bbb;font-size:13px'>No games scheduled yet.</div>";
+  } else {
+    var today = new Date();
+    games.forEach(function(g, idx) {
+      var gameDate = new Date(g.date);
+      var isPast = gameDate < today;
+      var isSeahawksHome = g.home.includes("Seahawks");
+      var opponent = isSeahawksHome ? g.visitor : g.home;
+      var homeAway = isSeahawksHome ? "HOME" : "AWAY";
+      var homeAwayColor = isSeahawksHome ? "#1A5276" : "#7D6608";
+      var homeAwayBg    = isSeahawksHome ? "#EBF5FB" : "#FEF9E7";
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f0f0f0";
+      var dateTile = document.createElement("div");
+      dateTile.style.cssText = "width:44px;height:44px;border-radius:10px;background:#f5f5f5;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0";
+      dateTile.innerHTML = "<div style='font-size:9px;font-weight:600;color:#999;text-transform:uppercase'>" + g.date.split(", ")[1].split(" ")[0] + "</div>" +
+        "<div style='font-size:15px;font-weight:700;color:#0B1F3A;line-height:1'>" + g.date.split(" ")[2].replace(",","") + "</div>";
+      var info = document.createElement("div");
+      info.style.cssText = "flex:1;min-width:0";
+      info.innerHTML = "<div style='display:flex;align-items:center;gap:6px;margin-bottom:2px'>" +
+        "<span style='font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:" + homeAwayBg + ";color:" + homeAwayColor + "'>" + homeAway + "</span>" +
+        "<span style='font-size:14px;font-weight:600;color:#0B1F3A'>" + opponent + "</span></div>" +
+        "<div style='font-size:11px;color:#999'>&#128337; " + g.time + " &nbsp; &#128205; FieldhouseUSA / " + g.location + "</div>";
+      var scoreWrap = document.createElement("div");
+      scoreWrap.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0";
+      var badge = document.createElement("div");
+      badge.id = "result-badge-" + idx;
+      badge.style.cssText = "width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0";
+      if (g.result === "W")      { badge.style.background="#EAFAF1"; badge.style.color="#1E8449"; badge.textContent="W"; }
+      else if (g.result === "L") { badge.style.background="#FCEBEB"; badge.style.color="#E24B4A"; badge.textContent="L"; }
+      else if (g.result === "T") { badge.style.background="#EBF5FB"; badge.style.color="#1A5276"; badge.textContent="T"; }
+      else                       { badge.style.background="#FEF9E7"; badge.style.color="#7D6608"; badge.textContent="\u2014"; }
+      var usInp = document.createElement("input");
+      usInp.id = "score-us-" + idx; usInp.type = "number"; usInp.min = "0"; usInp.placeholder = "Us";
+      usInp.value = g.seahawks || "";
+      usInp.style.cssText = "width:48px;text-align:center;border:1.5px solid #ddd;border-radius:6px;padding:4px 6px;font-size:13px;font-weight:600;font-family:inherit;outline:none;color:#0B1F3A";
+      usInp.onfocus = function(){ this.style.borderColor="#0B1F3A"; };
+      usInp.onblur  = function(){ this.style.borderColor="#ddd"; saveGameScore(idx); };
+      var dash = document.createElement("span");
+      dash.style.cssText = "font-size:13px;color:#ccc;font-weight:600"; dash.textContent = "\u2013";
+      var themInp = document.createElement("input");
+      themInp.id = "score-them-" + idx; themInp.type = "number"; themInp.min = "0"; themInp.placeholder = "Them";
+      themInp.value = g.opponent_score || "";
+      themInp.style.cssText = "width:48px;text-align:center;border:1.5px solid #ddd;border-radius:6px;padding:4px 6px;font-size:13px;font-weight:600;font-family:inherit;outline:none;color:#666";
+      themInp.onfocus = function(){ this.style.borderColor="#0B1F3A"; };
+      themInp.onblur  = function(){ this.style.borderColor="#ddd"; saveGameScore(idx); };
+      scoreWrap.appendChild(badge); scoreWrap.appendChild(usInp); scoreWrap.appendChild(dash); scoreWrap.appendChild(themInp);
+      row.appendChild(dateTile); row.appendChild(info); row.appendChild(scoreWrap);
+      card.appendChild(row);
+    });
+  }
   cont.appendChild(card);
 }
 
@@ -1665,13 +1767,7 @@ function buildGameSchedule() {
 function openAddTeamModal() {
   document.getElementById("team-modal-title").textContent = "Add New Team";
   document.getElementById("team-name-inp").value = "";
-  document.getElementById("team-age-inp").value = "";
-  document.getElementById("team-season-inp").value = "";
-  document.getElementById("team-league-inp").value = "";
-  document.getElementById("team-division-inp").value = "";
   document.getElementById("team-coach-inp").value = "";
-  document.getElementById("team-practice-inp").value = "";
-  document.getElementById("team-facility-inp").value = "";
   document.getElementById("team-notes-inp").value = "";
   document.getElementById("team-modal-save-btn").onclick = saveNewTeam;
   document.getElementById("add-team-modal").style.display = "flex";
@@ -1699,13 +1795,7 @@ function saveNewTeam() {
   var t = {
     id: "team_" + Date.now(),
     name: name,
-    ageGroup: document.getElementById("team-age-inp").value.trim(),
-    season: document.getElementById("team-season-inp").value.trim(),
-    league: document.getElementById("team-league-inp").value.trim(),
-    division: document.getElementById("team-division-inp").value.trim(),
     coach: document.getElementById("team-coach-inp").value.trim(),
-    practiceTime: document.getElementById("team-practice-inp").value.trim(),
-    facility: document.getElementById("team-facility-inp").value.trim(),
     notes: document.getElementById("team-notes-inp").value.trim(),
     colorIdx: teams.length % TEAM_COLORS.length
   };
@@ -1730,13 +1820,15 @@ function saveEditTeam() {
 // ─── ADD PLAYER TO TEAM ───────────────────────────────────────────────────────
 
 function openAddPlayerToTeamModal(teamId) {
-  var unassigned = roster.filter(function(p){ return !p.teamId || p.teamId !== teamId; });
+  // Show dev players not yet on this team
+  var alreadyOn = teamRoster.filter(function(p){ return p.teamId === teamId; }).map(function(p){ return p.id; });
+  var available = roster.filter(function(p){ return alreadyOn.indexOf(p.id) === -1; });
   var sel = document.getElementById("assign-player-select");
   sel.innerHTML = "<option value=''>-- Select a player --</option>";
-  unassigned.forEach(function(p){
+  available.forEach(function(p){
     var opt = document.createElement("option");
     opt.value = p.id;
-    opt.textContent = p.name + (p.grade ? " ("+p.grade+")" : "");
+    opt.textContent = p.name + (p.grade ? " (" + p.grade + ")" : "");
     sel.appendChild(opt);
   });
   document.getElementById("assign-team-id").value = teamId;
@@ -1751,8 +1843,18 @@ function assignPlayerToTeam() {
   var pid = document.getElementById("assign-player-select").value;
   var tid = document.getElementById("assign-team-id").value;
   if (!pid) { alert("Please select a player."); return; }
-  var p = roster.find(function(x){ return x.id === pid; });
-  if (p) { p.teamId = tid; saveRoster(); }
+  var devPlayer = roster.find(function(x){ return x.id === pid; });
+  if (devPlayer) {
+    var existing = teamRoster.find(function(x){ return x.id === pid && x.teamId === tid; });
+    if (!existing) {
+      teamRoster.push({
+        id: devPlayer.id, name: devPlayer.name, grade: devPlayer.grade,
+        position: devPlayer.position, jersey: "", email: "",
+        teamId: tid, devId: devPlayer.id, colorIdx: devPlayer.colorIdx
+      });
+      localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+    }
+  }
   closeAssignModal();
   openTeamDetail(tid);
 }
@@ -1900,21 +2002,13 @@ function goToRoster() {
 }
 
 function linkPlayerToDev(teamPlayerId) {
-  var p = roster.find(function(x){ return x.id === teamPlayerId; });
+  var p = teamRoster.find(function(x){ return x.id === teamPlayerId; });
   if (!p) return;
-  // Check if they already have a dev tracker
-  var devPlayer = roster.find(function(x){ return x.id !== teamPlayerId && x.name === p.name && x.program; });
-  if (devPlayer) {
-    p.devId = devPlayer.id;
-    saveRoster();
-    openTeamDetail(currentTeamId);
-    return;
-  }
-  // Pre-fill add player modal with this player's info and auto-link
+  // Pre-fill add player modal with this player's info
   document.getElementById("new-player-name").value = p.name;
   document.getElementById("new-player-grade").value = p.grade || "7th Grade";
   document.getElementById("new-player-position").value = p.position || "";
-  document.getElementById("new-player-team").value = p.team || "";
+  document.getElementById("new-player-team").value = "Seahawks";
   document.getElementById("add-player-modal").dataset.linkingTeamPlayer = teamPlayerId;
   document.getElementById("add-player-modal").style.display = "flex";
 }
@@ -1968,11 +2062,11 @@ function createPlayer() {
   var colorIdx = roster.filter(function(p){ return p.program; }).length % AVATAR_COLORS.length;
   roster.push({ id:id, name:name, grade:grade, position:position, team:team, program:selectedProgram, colorIdx:colorIdx });
 
-  // If linking from a team player, set their devId
+  // If linking from a team player, set their devId in teamRoster
   var linkingId = document.getElementById("add-player-modal").dataset.linkingTeamPlayer;
   if (linkingId) {
-    var tp = roster.find(function(x){ return x.id === linkingId; });
-    if (tp) tp.devId = id;
+    var tp = teamRoster.find(function(x){ return x.id === linkingId; });
+    if (tp) { tp.devId = id; localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster)); }
     document.getElementById("add-player-modal").dataset.linkingTeamPlayer = "";
   }
 
@@ -2056,39 +2150,9 @@ showScreen("landing-screen");
       <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Team Name *</label>
       <input id="team-name-inp" type="text" placeholder="e.g. Thunder" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <div>
-        <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Age Group / Grade</label>
-        <input id="team-age-inp" type="text" placeholder="e.g. 8th Grade Boys" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
-      </div>
-      <div>
-        <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Season</label>
-        <input id="team-season-inp" type="text" placeholder="e.g. Spring 2026" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <div>
-        <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">League Name</label>
-        <input id="team-league-inp" type="text" placeholder="e.g. Frisco Fieldhouse" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
-      </div>
-      <div>
-        <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Division</label>
-        <input id="team-division-inp" type="text" placeholder="e.g. Rec B" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <div>
-        <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Head Coach</label>
-        <input id="team-coach-inp" type="text" placeholder="e.g. Sam Lawrence" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
-      </div>
-      <div>
-        <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Practice Day & Time</label>
-        <input id="team-practice-inp" type="text" placeholder="e.g. Wednesdays @ 8:00 PM" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
-      </div>
-    </div>
-    <div style="margin-bottom:20px">
-      <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Facility / Location</label>
-      <input id="team-facility-inp" type="text" placeholder="e.g. FieldhouseUSA" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Head Coach</label>
+      <input id="team-coach-inp" type="text" placeholder="e.g. Sam Lawrence" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
     </div>
     <div style="margin-bottom:20px">
       <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Notes</label>
@@ -2118,6 +2182,22 @@ showScreen("landing-screen");
     <div style="display:flex;gap:10px">
       <button onclick="closeAssignModal()" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:#666">Cancel</button>
       <button onclick="assignPlayerToTeam()" style="flex:2;padding:10px;background:#0B1F3A;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Add to Team</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD SEASON MODAL -->
+<div id="add-season-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:400px">
+    <div style="font-size:17px;font-weight:700;color:#0B1F3A;margin-bottom:4px">Add New Season</div>
+    <div style="font-size:13px;color:#999;margin-bottom:20px">Name this season (e.g. Fall 2026, Spring 2027)</div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;font-weight:500;display:block;margin-bottom:5px">Season Name *</label>
+      <input id="season-name-inp" type="text" placeholder="e.g. Fall 2026" onkeydown="if(event.key==='Enter')saveNewSeason()" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#0B1F3A'" onblur="this.style.borderColor='#ddd'">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeAddSeasonModal()" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:#666">Cancel</button>
+      <button onclick="saveNewSeason()" style="flex:2;padding:10px;background:#0B1F3A;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Create Season</button>
     </div>
   </div>
 </div>
