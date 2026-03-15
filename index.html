@@ -1411,7 +1411,7 @@ function saveTeams() {
 }
 
 // ─── VERSIONED SEED ───────────────────────────────────────────────────────────
-var SEED_VERSION = "6";
+var SEED_VERSION = "7";
 
 // teamRoster = all players on teams (not necessarily in Development)
 var teamRoster = JSON.parse(localStorage.getItem("bdh_team_roster") || "[]");
@@ -3156,34 +3156,47 @@ function syncDevProfilesToTeamRoster() {
 syncDevProfilesToTeamRoster();
 showScreen("landing-screen");
 
-// On startup: check if Supabase has data
-// If empty → push local seed data up
-// If has data → pull it down (overrides local)
+// On startup: check Supabase
+// If has data → pull down and use it
+// If empty → push current in-memory seed data up then save locally
 sb.from("players").select("id").limit(1).then(function(res) {
   if (res.error) {
-    // Supabase unreachable — just use localStorage
-    console.warn("Supabase unavailable, using localStorage");
+    // Supabase unreachable — localStorage only
+    console.warn("Supabase unavailable, using localStorage only");
     return;
   }
 
-  if (!res.data || res.data.length === 0) {
-    // Database is empty — push seed data up first
+  if (res.data && res.data.length > 0) {
+    // Supabase has data — pull it all down
+    loadFromSupabase(function() {
+      syncDevProfilesToTeamRoster();
+      if (document.getElementById("roster-screen").style.display !== "none") buildRosterScreen();
+      if (document.getElementById("teams-screen").style.display !== "none") buildTeamsScreen();
+    });
+  } else {
+    // Supabase is empty — push everything up from in-memory (which was seeded at top of script)
     saveRoster();
     saveTeams();
     saveSeasons();
     saveTeamRoster();
-    // Also push Taha's profile
-    var tahaProfile = JSON.parse(localStorage.getItem("bdh_dev_profile_taha") || "null");
-    if (tahaProfile) saveDevProfile("taha", tahaProfile);
-    console.log("Seeded Supabase with local data");
-  } else {
-    // Database has data — pull it down
-    loadFromSupabase(function() {
-      syncDevProfilesToTeamRoster();
-      // Rebuild current screen if already on one
-      if (document.getElementById("roster-screen").style.display !== "none") buildRosterScreen();
-      if (document.getElementById("teams-screen").style.display !== "none") buildTeamsScreen();
-    });
+    // Save Taha's hardcoded profile
+    var tahaDefaults = {
+      name:"Taha Ameen Jirani", dob:"Jan 21, 2013", grade:"7th Grade",
+      phone:"214-843-5189", city:"McKinney, TX", team:"Seahawks",
+      team_level:"Recreation / Tournament", jersey:"#12",
+      position:"Center / Power Forward", dominant_hand:"Right",
+      preferred_foot:"Right", years_playing:"2.5 years",
+      previous_coaching:"None", session_format:"60 min / 1-on-1",
+      available_days:"Tuesday",
+      short_term_goal:"Mid-range shooting, ball handling, footwork",
+      long_term_goal:"Varsity high school basketball",
+      parent_name:"Nabil Jirani", parent_relationship:"Father",
+      parent_phone:"214-251-5967", parent_email:"nabil.jirani@gmail.com",
+      emergency_contact:"Same as above", emergency_phone:"Same as above",
+      medical_history:"Past injury: Hand break (resolved)"
+    };
+    saveDevProfile("taha", tahaDefaults);
+    console.log("Seeded Supabase from in-memory data");
   }
 });
 </script>
