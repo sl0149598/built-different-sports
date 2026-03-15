@@ -1433,9 +1433,8 @@ if (localStorage.getItem("bdh_seed_version") !== SEED_VERSION) {
     notes: "",
     colorIdx: 0
   }];
-  saveTeams();
+  localStorage.setItem("bdh_teams", JSON.stringify(teams));
 
-  // Full Seahawks team roster — stored separately from Development
   teamRoster = [
     { id:"taha",       name:"Taha Jirani",    grade:"7th Grade", position:"C/PF", jersey:"12", email:"nabiljirani@hotmail.com",    teamId:seahawksId, devId:"taha", colorIdx:0 },
     { id:"tp_lesean",  name:"Lesean Kaitei",  grade:"7th Grade", position:"",     jersey:"7",  email:"skaitei@gmail.com",          teamId:seahawksId, devId:null,   colorIdx:1 },
@@ -1446,9 +1445,8 @@ if (localStorage.getItem("bdh_seed_version") !== SEED_VERSION) {
     { id:"tp_oliver",  name:"Oliver Voss",    grade:"7th Grade", position:"",     jersey:"0",  email:"ambervoss2@gmail.com",       teamId:seahawksId, devId:null,   colorIdx:1 },
     { id:"tp_levi",    name:"Levi Wincher",   grade:"7th Grade", position:"",     jersey:"5",  email:"leahsmithn@gmail.com",       teamId:seahawksId, devId:null,   colorIdx:2 }
   ];
-  saveTeamRoster();
+  localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
 
-  // Development roster — ONLY Taha
   var existingTaha = roster.find(function(r){ return r.id === "taha"; });
   roster = [existingTaha || {
     id: "taha",
@@ -1468,7 +1466,7 @@ if (localStorage.getItem("bdh_seed_version") !== SEED_VERSION) {
     roster[0].jersey = "12";
     roster[0].devId = "taha";
   }
-  saveRoster();
+  localStorage.setItem("bdh_roster", JSON.stringify(roster));
   localStorage.setItem("bdh_seed_version", SEED_VERSION);
 }
 
@@ -3161,7 +3159,6 @@ showScreen("landing-screen");
 // If empty → push current in-memory seed data up then save locally
 sb.from("players").select("id").limit(1).then(function(res) {
   if (res.error) {
-    // Supabase unreachable — localStorage only
     console.warn("Supabase unavailable, using localStorage only");
     return;
   }
@@ -3174,12 +3171,13 @@ sb.from("players").select("id").limit(1).then(function(res) {
       if (document.getElementById("teams-screen").style.display !== "none") buildTeamsScreen();
     });
   } else {
-    // Supabase is empty — push everything up from in-memory (which was seeded at top of script)
+    // Supabase is empty — push everything from in-memory
     saveRoster();
     saveTeams();
     saveSeasons();
     saveTeamRoster();
-    // Save Taha's hardcoded profile
+
+    // Push Taha's hardcoded profile
     var tahaDefaults = {
       name:"Taha Ameen Jirani", dob:"Jan 21, 2013", grade:"7th Grade",
       phone:"214-843-5189", city:"McKinney, TX", team:"Seahawks",
@@ -3196,7 +3194,7 @@ sb.from("players").select("id").limit(1).then(function(res) {
       medical_history:"Past injury: Hand break (resolved)"
     };
     saveDevProfile("taha", tahaDefaults);
-    console.log("Seeded Supabase from in-memory data");
+    console.log("Seeded Supabase successfully");
   }
 });
 </script>
