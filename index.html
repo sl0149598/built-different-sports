@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Built Different Sports — Player Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,sans-serif;color:#1a1a1a;background:#0B1F3A url('Built_Better_Sports-Web_Background.png') center center / cover fixed;min-height:100vh}
@@ -1445,7 +1446,7 @@ if (localStorage.getItem("bdh_seed_version") !== SEED_VERSION) {
     { id:"tp_oliver",  name:"Oliver Voss",    grade:"7th Grade", position:"",     jersey:"0",  email:"ambervoss2@gmail.com",       teamId:seahawksId, devId:null,   colorIdx:1 },
     { id:"tp_levi",    name:"Levi Wincher",   grade:"7th Grade", position:"",     jersey:"5",  email:"leahsmithn@gmail.com",       teamId:seahawksId, devId:null,   colorIdx:2 }
   ];
-  localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+  saveTeamRoster();
 
   // Development roster — ONLY Taha
   var existingTaha = roster.find(function(r){ return r.id === "taha"; });
@@ -1828,6 +1829,7 @@ function saveGameScore(idx) {
   var saved = JSON.parse(localStorage.getItem("bdh_game_scores_" + currentSeasonId) || "{}");
   saved[idx] = { seahawks: g.seahawks, opponent_score: g.opponent_score, result: g.result };
   localStorage.setItem("bdh_game_scores_" + currentSeasonId, JSON.stringify(saved));
+  saveGameScores(currentSeasonId);
   var wins = season.games.filter(function(x){ return x.result === "W"; }).length;
   var losses = season.games.filter(function(x){ return x.result === "L"; }).length;
   var wEl = document.getElementById("record-wins");
@@ -1937,7 +1939,7 @@ function deleteTeam() {
   saveSeasons();
   // Remove players from teamRoster for this team
   teamRoster = teamRoster.filter(function(p){ return p.teamId !== currentTeamId; });
-  localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+  saveTeamRoster();
   closeTeamModal();
   currentTeamId = null;
   goToTeams();
@@ -2031,7 +2033,7 @@ function assignPlayerToTeam() {
         position: devPlayer.position, jersey: "", email: "",
         teamId: tid, devId: devPlayer.id, colorIdx: devPlayer.colorIdx
       });
-      localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+      saveTeamRoster();
     }
   }
   closeAssignModal();
@@ -2149,9 +2151,10 @@ function openPlayer(id) {
 
   // Wire profile fields to save dev profile on blur
   setTimeout(function(){
+    var handler = function(){ saveCurrentDevProfile(); };
     document.querySelectorAll("#view-profile .profile-inp, #view-profile .profile-ta").forEach(function(f){
-      f.removeEventListener("blur", saveDevProfile);
-      f.addEventListener("blur", saveDevProfile);
+      f.removeEventListener("blur", handler);
+      f.addEventListener("blur", handler);
     });
   }, 100);
 
@@ -2159,16 +2162,12 @@ function openPlayer(id) {
 }
 
 function resetPlayerState(p) {
-  // Set BLOCKS based on player program
   BLOCKS = getBlocksForProgram(p.program || "8week-intermediate");
-
-  // Reset state
   state = {};
   activeSI = {};
 
-  // Load from localStorage if exists
+  // Load skills from localStorage (Supabase will refresh in background)
   var saved = JSON.parse(localStorage.getItem("bdh_player_" + p.id) || "null");
-
   BLOCKS.forEach(function(b){
     state[b.id] = {};
     b.si.forEach(function(si){
@@ -2181,19 +2180,16 @@ function resetPlayerState(p) {
     activeSI[b.id] = b.si[0];
   });
 
-  // Reset phys data
   physData = {};
   TESTS.forEach(function(t){ physData[t] = {intake:"", w4:"", w8:""}; });
   var savedPhys = JSON.parse(localStorage.getItem("bdh_phys_" + p.id) || "null");
   if (savedPhys) physData = savedPhys;
 
-  // Reset coach reads
   coachReads = JSON.parse(localStorage.getItem("bdh_reads_" + p.id) || "[]");
   if (coachReads.length === 0 && p.id === "taha") {
     coachReads = [{ date: "Mar 17, 2025", comments: ["Athletic build", "Above average athleticism", "Motor skills: developing"] }];
   }
 
-  // Reset body measurements
   bodyMeasurements = [
     { label:"Height",         value:69.0,  step:0.25, display:function(v){ var ft=Math.floor(v/12); var i=Math.round((v%12)*4)/4; return ft+"'"+i+'"'; } },
     { label:"Weight",         value:165,   step:1,    display:function(v){ return v+" lbs"; } },
@@ -2207,14 +2203,27 @@ function resetPlayerState(p) {
   if (savedMeas) bodyMeasurements.forEach(function(m,i){ if(savedMeas[i]) m.value = savedMeas[i]; });
 
   physBuilt = false;
+
+  // Pull latest from Supabase in background and refresh localStorage
+  sb.from("player_skills").select("data").eq("id", p.id).single().then(function(res) {
+    if (!res.error && res.data && res.data.data) {
+      localStorage.setItem("bdh_player_" + p.id, JSON.stringify(res.data.data));
+    }
+  });
+  sb.from("player_physical").select("data").eq("id", p.id).single().then(function(res) {
+    if (!res.error && res.data && res.data.data) {
+      var d = res.data.data;
+      if (d.physData)  localStorage.setItem("bdh_phys_"  + p.id, JSON.stringify(d.physData));
+      if (d.coachReads) localStorage.setItem("bdh_reads_" + p.id, JSON.stringify(d.coachReads));
+      if (d.bodyMeasurements) localStorage.setItem("bdh_meas_" + p.id, JSON.stringify(d.bodyMeasurements));
+    }
+  });
 }
 
 function saveCurrentPlayerState() {
   if (!currentPlayerId) return;
-  localStorage.setItem("bdh_player_" + currentPlayerId, JSON.stringify(state));
-  localStorage.setItem("bdh_phys_" + currentPlayerId, JSON.stringify(physData));
-  localStorage.setItem("bdh_reads_" + currentPlayerId, JSON.stringify(coachReads));
-  localStorage.setItem("bdh_meas_" + currentPlayerId, JSON.stringify(bodyMeasurements.map(function(m){ return m.value; })));
+  savePlayerSkills(currentPlayerId);
+  savePlayerPhysical(currentPlayerId);
 }
 
 function goToRoster() {
@@ -2269,9 +2278,9 @@ function createPlayer() {
       parent_phone: tp.phone||"", parent_email: tp.email||"",
       emergency_contact: tp.emergency||"", emergency_phone:"", medical_history:""
     };
-    localStorage.setItem("bdh_dev_profile_" + id, JSON.stringify(devProfile));
+    saveDevProfile(id, devProfile);
     tp.devId = id;
-    localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+    saveTeamRoster();
     document.getElementById("add-player-modal").dataset.linkingTeamPlayer = "";
     saveRoster();
     document.getElementById("program-modal").style.display = "none";
@@ -2519,7 +2528,7 @@ function openTeamPlayerProfile(playerId) {
       p.phone    = p.phone    || devSaved.parent_phone || p.phone;
       p.email    = p.email    || devSaved.parent_email || p.email;
       p.emergency = p.emergency || devSaved.emergency_contact || p.emergency;
-      localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+      saveTeamRoster();
     } else {
       // Try reading live from the DOM if this player is currently loaded
       var profileInputs = document.querySelectorAll("#view-profile .profile-inp, #view-profile .profile-ta");
@@ -2533,7 +2542,7 @@ function openTeamPlayerProfile(playerId) {
         p.phone    = p.phone    || vals[20] || p.phone;
         p.email    = p.email    || vals[21] || p.email;
         p.emergency = p.emergency || vals[22] || p.emergency;
-        localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+        saveTeamRoster();
       }
     }
   }
@@ -2603,7 +2612,7 @@ function saveTeamPlayerProfile() {
   p.emergency = document.getElementById("tpp-e-emergency").value.trim();
   p.notes     = document.getElementById("tpp-e-notes").value.trim();
 
-  localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+  saveTeamRoster();
 
   // Refresh view mode
   document.getElementById("tpp-name").textContent = p.name;
@@ -2694,7 +2703,7 @@ function permanentlyDeletePlayer() {
 
   // Remove dev link from team roster
   teamRoster.forEach(function(tp){ if(tp.devId === id) tp.devId = null; });
-  localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+  saveTeamRoster();
 
   closePlayerDeleteModal();
   goToRoster();
@@ -2949,11 +2958,11 @@ function loadProfileFields(p) {
 
   // Save to localStorage if using defaults (so future opens load correctly)
   if (!saved && p.id === "taha") {
-    localStorage.setItem("bdh_dev_profile_" + p.id, JSON.stringify(defaults));
+    saveDevProfile(p.id, defaults);
   }
 }
 
-function saveDevProfile() {
+function saveCurrentDevProfile() {
   if (!currentPlayerId) return;
   var fields = [
     ["pf-name","name"],["pf-dob","dob"],["pf-grade","grade"],
@@ -2980,9 +2989,8 @@ function saveDevProfile() {
     var el = document.getElementById(pair[0]);
     if (el) profile[pair[1]] = el.value;
   });
-  localStorage.setItem("bdh_dev_profile_" + currentPlayerId, JSON.stringify(profile));
-
-  // Push to linked team roster player
+  saveDevProfile(currentPlayerId, profile);
+  // Push to linked team roster
   var teamPlayer = teamRoster.find(function(tp){ return tp.devId === currentPlayerId; });
   if (teamPlayer) {
     teamPlayer.name     = profile.name     || teamPlayer.name;
@@ -2993,8 +3001,134 @@ function saveDevProfile() {
     teamPlayer.phone    = profile.parent_phone || teamPlayer.phone;
     teamPlayer.email    = profile.parent_email || teamPlayer.email;
     teamPlayer.emergency = (profile.emergency_contact||"") + (profile.emergency_phone ? " · "+profile.emergency_phone : "") || teamPlayer.emergency;
-    localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+    saveTeamRoster();
   }
+}
+
+// ─── SUPABASE ─────────────────────────────────────────────────────────────────
+
+var SUPABASE_URL  = "https://uadeuxedceewrpupecvy.supabase.co";
+var SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZGV1eGVkY2Vld3JwdXBlY3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1OTcyMzgsImV4cCI6MjA4OTE3MzIzOH0.845LRHg6MzWGiZ1eSO67uXvvgmCf_n03c3OJvxoDcQA";
+var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Generic upsert — table has (id text primary key, data jsonb)
+function sbUpsert(table, id, data) {
+  sb.from(table).upsert({ id: id, data: data, updated_at: new Date().toISOString() })
+    .then(function(res){ if (res.error) console.warn("Supabase upsert error [" + table + "]:", res.error.message); });
+}
+
+// Generic upsert for tables keyed differently (team_seasons uses team_id, game_scores uses season_id)
+function sbUpsertKey(table, keyCol, keyVal, data) {
+  var row = { data: data, updated_at: new Date().toISOString() };
+  row[keyCol] = keyVal;
+  sb.from(table).upsert(row)
+    .then(function(res){ if (res.error) console.warn("Supabase upsert error [" + table + "]:", res.error.message); });
+}
+
+// ── Wrapped save functions — write localStorage + Supabase simultaneously ──
+
+function saveRoster() {
+  localStorage.setItem("bdh_roster", JSON.stringify(roster));
+  // Upsert each player individually so deletes/archives are reflected
+  roster.forEach(function(p) { sbUpsert("players", p.id, p); });
+}
+
+function saveTeams() {
+  localStorage.setItem("bdh_teams", JSON.stringify(teams));
+  teams.forEach(function(t) { sbUpsert("teams", t.id, t); });
+}
+
+function saveSeasons() {
+  localStorage.setItem("bdh_team_seasons", JSON.stringify(teamSeasons));
+  Object.keys(teamSeasons).forEach(function(tid) {
+    sbUpsertKey("team_seasons", "team_id", tid, teamSeasons[tid]);
+  });
+}
+
+function saveTeamRoster() {
+  saveTeamRoster();
+  teamRoster.forEach(function(p) { sbUpsert("team_roster", p.id, p); });
+}
+
+function saveDevProfile(playerId, profile) {
+  if (!playerId || !profile) return;
+  localStorage.setItem("bdh_dev_profile_" + playerId, JSON.stringify(profile));
+  sbUpsert("player_profiles", playerId, profile);
+}
+
+function savePlayerSkills(playerId) {
+  localStorage.setItem("bdh_player_" + playerId, JSON.stringify(state));
+  sbUpsert("player_skills", playerId, state);
+}
+
+function savePlayerPhysical(playerId) {
+  localStorage.setItem("bdh_phys_" + playerId, JSON.stringify(physData));
+  localStorage.setItem("bdh_reads_" + playerId, JSON.stringify(coachReads));
+  localStorage.setItem("bdh_meas_" + playerId, JSON.stringify(bodyMeasurements.map(function(m){ return m.value; })));
+  sbUpsert("player_physical", playerId, {
+    physData: physData,
+    coachReads: coachReads,
+    bodyMeasurements: bodyMeasurements.map(function(m){ return m.value; })
+  });
+}
+
+function saveGameScores(seasonId) {
+  var saved = JSON.parse(localStorage.getItem("bdh_game_scores_" + seasonId) || "{}");
+  sbUpsertKey("game_scores", "season_id", seasonId, saved);
+}
+
+// ── Load all data from Supabase on startup (overrides localStorage if newer) ──
+
+function loadFromSupabase(callback) {
+  var loaded = 0;
+  var total = 5;
+  function done() { loaded++; if (loaded >= total) callback(); }
+
+  // Players
+  sb.from("players").select("*").then(function(res) {
+    if (!res.error && res.data && res.data.length > 0) {
+      roster = res.data.map(function(r){ return r.data; });
+      localStorage.setItem("bdh_roster", JSON.stringify(roster));
+    }
+    done();
+  });
+
+  // Teams
+  sb.from("teams").select("*").then(function(res) {
+    if (!res.error && res.data && res.data.length > 0) {
+      teams = res.data.map(function(r){ return r.data; });
+      localStorage.setItem("bdh_teams", JSON.stringify(teams));
+    }
+    done();
+  });
+
+  // Team roster
+  sb.from("team_roster").select("*").then(function(res) {
+    if (!res.error && res.data && res.data.length > 0) {
+      teamRoster = res.data.map(function(r){ return r.data; });
+      saveTeamRoster();
+    }
+    done();
+  });
+
+  // Team seasons
+  sb.from("team_seasons").select("*").then(function(res) {
+    if (!res.error && res.data && res.data.length > 0) {
+      res.data.forEach(function(r){ teamSeasons[r.team_id] = r.data; });
+      localStorage.setItem("bdh_team_seasons", JSON.stringify(teamSeasons));
+    }
+    done();
+  });
+
+  // Player profiles
+  sb.from("player_profiles").select("*").then(function(res) {
+    if (!res.error && res.data) {
+      res.data.forEach(function(r){
+        localStorage.setItem("bdh_dev_profile_" + r.id, JSON.stringify(r.data));
+      });
+    }
+    done();
+  });
 }
 
 // ─── INIT ─────────────────────────────────────────
@@ -3016,11 +3150,25 @@ function syncDevProfilesToTeamRoster() {
     sync("email",    saved.parent_email);
     sync("emergency", (saved.emergency_contact||"") + (saved.emergency_phone ? " · "+saved.emergency_phone : ""));
   });
-  localStorage.setItem("bdh_team_roster", JSON.stringify(teamRoster));
+  saveTeamRoster();
 }
 
 syncDevProfilesToTeamRoster();
 showScreen("landing-screen");
+
+// Load latest data from Supabase in background — refreshes on next navigation
+loadFromSupabase(function() {
+  syncDevProfilesToTeamRoster();
+  // Push seed data to Supabase if this is a fresh database
+  sb.from("players").select("id").limit(1).then(function(res) {
+    if (!res.error && res.data && res.data.length === 0) {
+      saveRoster();
+      saveTeams();
+      saveSeasons();
+      saveTeamRoster();
+    }
+  });
+});
 </script>
 <!-- ADD PLAYER MODAL -->
 <div id="add-player-modal" class="modal-overlay">
