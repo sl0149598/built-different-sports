@@ -1243,9 +1243,9 @@ function buildPhysTable() {
       td.style.cssText = "padding:5px 8px;text-align:center";
       var inp = document.createElement("input");
       inp.className = "phys-inp";
-      inp.value = physData[t][p];
+      inp.value = (physData[t] && physData[t][p]) ? physData[t][p] : "";
       inp.placeholder = "—";
-      (function(test, period){ inp.addEventListener("input", function(){ physData[test][period] = this.value; }); })(t, p);
+      (function(test, period){ inp.addEventListener("input", function(){ if (!physData[test]) physData[test]={}; physData[test][period] = this.value; savePlayerPhysical(currentPlayerId); }); })(t, p);
       td.appendChild(inp);
       tr.appendChild(td);
     });
@@ -2163,6 +2163,7 @@ function resetPlayerState(p) {
   BLOCKS = getBlocksForProgram(p.program || "8week-intermediate");
   state = {};
   activeSI = {};
+  physBuilt = false; // always rebuild physical table for each player
 
   // Load skills from localStorage (Supabase will refresh in background)
   var saved = JSON.parse(localStorage.getItem("bdh_player_" + p.id) || "null");
