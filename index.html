@@ -1147,14 +1147,19 @@ function sendShareEmail() {
   var p = roster.find(function(x){ return x.id === currentPlayerId; }) || {};
   var playerName = p.name || "Player";
 
+  // Encode report as a data URL so parent can open it in browser
+  var reportLink = "data:text/html;charset=utf-8," + encodeURIComponent(reportHTML);
+
   emailjs.init("LreeRZ-I5KJvslRRd");
   emailjs.send("service_m51vzg6", "template_9v5qvox", {
     to_email: email,
     to_name: email,
     from_name: "Built Different Sports",
     subject: "Built Different Sports — " + playerName + " " + sessionLabels,
-    message: msg || "",
-    report_html: reportHTML
+    message: (msg ? msg + "\n\n" : "") +
+      "View " + playerName + "'s " + (noSessions ? "8-week program overview" : sessionLabels + " report") + " here:\n" +
+      reportLink,
+    report_html: ""
   }).then(function() {
     sendBtn.textContent = "✓ Sent!";
     sendBtn.style.background = "#1E8449";
@@ -2924,6 +2929,7 @@ function sendSeasonSchedules() {
     var seasonName = season.name;
     var teamName = t ? t.name : "Team";
     var reportHTML = buildSeasonScheduleHTML(p.name, seasonName, teamName, season, t);
+    var reportLink = "data:text/html;charset=utf-8," + encodeURIComponent(reportHTML);
 
     emailjs.init("LreeRZ-I5KJvslRRd");
     var promise = emailjs.send("service_m51vzg6", "template_9v5qvox", {
@@ -2931,8 +2937,9 @@ function sendSeasonSchedules() {
       to_name: p.name,
       from_name: "Built Different Sports",
       subject: teamName + " — " + seasonName + " Schedule",
-      message: msg || "",
-      report_html: reportHTML
+      message: (msg ? msg + "\n\n" : "") +
+        "View the " + seasonName + " schedule here:\n" + reportLink,
+      report_html: ""
     });
     emailjs_promises.push(promise);
   });
