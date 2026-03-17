@@ -1153,10 +1153,7 @@ function sendShareEmail() {
     to_name: email,
     from_name: "Built Different Sports",
     subject: "Built Different Sports — " + playerName + " " + sessionLabels,
-    message: (msg ? msg + "\n\n" : "") +
-      "Hi,\n\nPlease find " + playerName + "'s Built Different Sports " +
-      (noSessions ? "8-week program overview" : "progress report for " + sessionLabels) + " attached.\n\n" +
-      "— Built Different Sports Coach",
+    message: msg || "",
     report_html: reportHTML
   }).then(function() {
     sendBtn.textContent = "✓ Sent!";
@@ -2934,8 +2931,7 @@ function sendSeasonSchedules() {
       to_name: p.name,
       from_name: "Built Different Sports",
       subject: teamName + " — " + seasonName + " Schedule",
-      message: (msg ? msg + "\n\n" : "") +
-        "Hi " + p.name.split(" ")[0] + ",\n\nPlease find your " + seasonName + " season schedule for the " + teamName + " attached below.\n\n— Built Different Sports",
+      message: msg || "",
       report_html: reportHTML
     });
     emailjs_promises.push(promise);
