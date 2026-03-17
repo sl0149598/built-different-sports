@@ -1146,8 +1146,6 @@ function sendShareEmail() {
   var reportHTML = buildReportHTML(noSessions ? [] : checkedSIs);
   var p = roster.find(function(x){ return x.id === currentPlayerId; }) || {};
   var playerName = p.name || "Player";
-  var reportLink = "data:text/html;charset=utf-8," + encodeURIComponent(reportHTML);
-  var linkHTML = "<a href='" + reportLink + "' style='color:#E67E22;font-weight:600'>" + (noSessions ? "Program Overview" : "Session Update") + "</a>";
 
   emailjs.init("LreeRZ-I5KJvslRRd");
   emailjs.send("service_m51vzg6", "template_9v5qvox", {
@@ -1156,7 +1154,7 @@ function sendShareEmail() {
     from_name: "Built Different Sports",
     subject: "Built Different Sports — " + playerName + " " + sessionLabels,
     message: msg || "",
-    report_html: linkHTML
+    report_html: reportHTML
   }).then(function() {
     sendBtn.textContent = "✓ Sent!";
     sendBtn.style.background = "#1E8449";
@@ -2926,8 +2924,6 @@ function sendSeasonSchedules() {
     var seasonName = season.name;
     var teamName = t ? t.name : "Team";
     var reportHTML = buildSeasonScheduleHTML(p.name, seasonName, teamName, season, t);
-    var reportLink = "data:text/html;charset=utf-8," + encodeURIComponent(reportHTML);
-    var linkHTML = "<a href='" + reportLink + "' style='color:#E67E22;font-weight:600'>Season Schedule</a>";
 
     emailjs.init("LreeRZ-I5KJvslRRd");
     var promise = emailjs.send("service_m51vzg6", "template_9v5qvox", {
@@ -2936,7 +2932,7 @@ function sendSeasonSchedules() {
       from_name: "Built Different Sports",
       subject: teamName + " — " + seasonName + " Schedule",
       message: msg || "",
-      report_html: linkHTML
+      report_html: reportHTML
     });
     emailjs_promises.push(promise);
   });
