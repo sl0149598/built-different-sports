@@ -1005,7 +1005,19 @@ function renderSummaryCards() {
 }
 
 function buildReportHTML(checkedSIs) {
-  var sessionLabels = checkedSIs.map(function(si){ return SESSION_META[si].label; }).join(", ");
+  // Get current player info
+  var p = roster.find(function(x){ return x.id === currentPlayerId; }) || {};
+  var profile = JSON.parse(localStorage.getItem("bdh_dev_profile_" + currentPlayerId) || "null") || {};
+  var playerName = profile.name || p.name || "Player";
+  var playerGrade = profile.grade || p.grade || "";
+  var playerPosition = profile.position || p.position || "";
+  var playerTeam = profile.team || p.team || "";
+  var playerJersey = (profile.jersey || p.jersey || "").replace("#","");
+  var noSessionData = !checkedSIs || checkedSIs.length === 0;
+
+  var sessionLabels = noSessionData ? "Full Program Overview" :
+    checkedSIs.map(function(si){ return SESSION_META[si].label; }).join(", ");
+
   var html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>";
   html += "<title>Built Different Sports — Progress Report</title>";
   html += "<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;color:#111;background:#f5f5f5;padding:20px}</style></head><body>";
@@ -1014,73 +1026,79 @@ function buildReportHTML(checkedSIs) {
   // Header
   html += "<div style='display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0B1F3A;padding-bottom:12px;margin-bottom:20px'>" +
     "<div><div style='font-size:22px;font-weight:800;color:#0B1F3A;letter-spacing:.05em'>&#127936; BUILT DIFFERENT SPORTS</div>" +
-    "<div style='font-size:13px;color:#E67E22;font-weight:600;margin-top:2px'>Player Progress Report</div></div>" +
+    "<div style='font-size:13px;color:#E67E22;font-weight:600;margin-top:2px'>" + (noSessionData ? "8-Week Program Overview" : "Player Progress Report") + "</div></div>" +
     "<div style='text-align:right;font-size:12px;color:#666'>" +
-      "<div style='font-weight:600;font-size:15px;color:#0B1F3A'>Taha Ameen Jirani</div>" +
-      "<div>7th Grade &middot; C/PF &middot; Seahawks #12</div>" +
-      "<div style='margin-top:4px'>Sessions: " + sessionLabels + "</div>" +
+      "<div style='font-weight:600;font-size:15px;color:#0B1F3A'>" + playerName + "</div>" +
+      "<div>" + [playerGrade, playerPosition, playerTeam + (playerJersey ? " #"+playerJersey : "")].filter(Boolean).join(" &middot; ") + "</div>" +
+      "<div style='margin-top:4px'>" + sessionLabels + "</div>" +
       "<div>Generated: " + new Date().toLocaleDateString("en-US", {month:"long",day:"numeric",year:"numeric"}) + "</div>" +
     "</div></div>";
 
+  // Program intro if no sessions selected
+  if (noSessionData) {
+    html += "<div style='background:#EBF5FB;border-radius:8px;padding:14px;margin-bottom:20px;border-left:4px solid #1A5276'>" +
+      "<div style='font-size:13px;font-weight:700;color:#1A5276;margin-bottom:4px'>About This Program</div>" +
+      "<div style='font-size:12px;color:#444'>This document outlines " + playerName.split(" ")[0] + "'s 8-week development program. " +
+      "Each block covers 2 sessions. Ratings will be filled in as sessions are completed.</div></div>";
+  }
+
   BLOCKS.forEach(function(b) {
-    var activeSessions = b.si.filter(function(si){ return checkedSIs.indexOf(si) !== -1; });
-    if (activeSessions.length === 0) return;
-
-    var avg = blockAvg(b.id);
-    var col = avg ? ratingColor(avg) : "#ccc";
-    var pct = avg ? Math.round((avg/5)*100) : 0;
-    var flaggedDrills = b.drills.filter(function(d){
-      return activeSessions.some(function(si){ return state[b.id][si].flags[d]; });
-    });
-
     html += "<div style='margin-bottom:24px;page-break-inside:avoid'>";
     html += "<div style='display:flex;align-items:center;gap:10px;margin-bottom:8px'>" +
       "<div style='width:5px;height:36px;border-radius:3px;background:" + b.color + "'></div>" +
       "<div style='flex:1'><div style='font-size:15px;font-weight:700;color:#0B1F3A'>" + b.label + "</div>" +
-      "<div style='font-size:11px;color:#999'>Weeks " + b.weeks + "</div></div>" +
-      "<div style='text-align:right'>" +
-        "<div style='font-size:13px;font-weight:700;color:" + col + "'>" + (avg ? avg.toFixed(1) + " / 5" : "No data") + "</div>" +
+      "<div style='font-size:11px;color:#999'>Weeks " + b.weeks + "</div></div>";
+
+    if (!noSessionData) {
+      var avg = blockAvg(b.id);
+      var col = avg ? ratingColor(avg) : "#ccc";
+      var pct = avg ? Math.round((avg/5)*100) : 0;
+      html += "<div style='text-align:right'>" +
+        "<div style='font-size:13px;font-weight:700;color:" + col + "'>" + (avg ? avg.toFixed(1) + " / 5" : "No data yet") + "</div>" +
         "<div style='width:120px;height:7px;background:#eee;border-radius:4px;margin-top:4px;overflow:hidden'>" +
           "<div style='width:" + pct + "%;height:100%;background:" + col + ";border-radius:4px'></div></div>" +
-      "</div></div>";
+        "</div>";
+    }
+    html += "</div>";
 
+    // Drill list
     html += "<table style='width:100%;border-collapse:collapse;font-size:12px'><thead><tr style='background:#f5f5f5'>" +
       "<th style='text-align:left;padding:6px 8px;border:1px solid #e0e0e0;color:#555'>Drill</th>";
-    activeSessions.forEach(function(si){
-      html += "<th colspan='2' style='text-align:center;padding:6px 8px;border:1px solid #e0e0e0;color:#555'>" + SESSION_META[si].label + "<br><span style='font-weight:400;font-size:10px'>" + SESSION_META[si].date + "</span></th>";
-    });
-    html += "</tr><tr style='background:#fafafa'><th style='border:1px solid #e0e0e0'></th>";
-    activeSessions.forEach(function(){
-      html += "<th style='text-align:center;padding:3px 6px;border:1px solid #e0e0e0;font-size:10px;color:#aaa;font-weight:400'>Coach</th>" +
-              "<th style='text-align:center;padding:3px 6px;border:1px solid #e0e0e0;font-size:10px;color:#aaa;font-weight:400'>Player</th>";
-    });
+
+    if (noSessionData) {
+      html += "<th style='text-align:center;padding:6px 8px;border:1px solid #e0e0e0;color:#555;width:80px'>Session 1</th>" +
+              "<th style='text-align:center;padding:6px 8px;border:1px solid #e0e0e0;color:#555;width:80px'>Session 2</th>";
+    } else {
+      var activeSessions = b.si.filter(function(si){ return checkedSIs.indexOf(si) !== -1; });
+      activeSessions.forEach(function(si){
+        html += "<th colspan='2' style='text-align:center;padding:6px 8px;border:1px solid #e0e0e0;color:#555'>" +
+          SESSION_META[si].label + "<br><span style='font-weight:400;font-size:10px'>" + SESSION_META[si].date + "</span></th>";
+      });
+    }
     html += "</tr></thead><tbody>";
 
     b.drills.forEach(function(d, i){
-      var flagged = activeSessions.some(function(si){ return state[b.id][si].flags[d]; });
-      var notes = activeSessions.map(function(si){ return state[b.id][si].notes[d]; }).filter(Boolean).join(" | ");
       html += "<tr style='background:" + (i%2===0?"#fff":"#fafafa") + "'>" +
-        "<td style='padding:6px 8px;border:1px solid #e0e0e0;color:" + (flagged?"#E24B4A":"#111") + "'>" +
-        (flagged ? "⚑ " : "") + d +
-        (notes ? "<div style='font-size:10px;color:#888;margin-top:2px;font-style:italic'>" + notes + "</div>" : "") + "</td>";
-      activeSessions.forEach(function(si){
-        [state[b.id][si].coach[d], state[b.id][si].player[d]].forEach(function(r){
-          var c = ratingColor(r);
-          html += "<td style='padding:5px 8px;text-align:center;border:1px solid #e0e0e0'>" +
-            (r ? "<span style='display:inline-block;width:22px;height:22px;border-radius:50%;background:" + c + "22;border:1.5px solid " + c + ";color:" + c + ";font-size:11px;font-weight:700;line-height:20px;text-align:center'>" + r + "</span>"
-               : "<span style='color:#ddd'>—</span>") + "</td>";
+        "<td style='padding:6px 8px;border:1px solid #e0e0e0;color:#111'>" + d + "</td>";
+
+      if (noSessionData) {
+        html += "<td style='padding:5px 8px;text-align:center;border:1px solid #e0e0e0;color:#ddd'>—</td>" +
+                "<td style='padding:5px 8px;text-align:center;border:1px solid #e0e0e0;color:#ddd'>—</td>";
+      } else {
+        var activeSessions = b.si.filter(function(si){ return checkedSIs.indexOf(si) !== -1; });
+        var flagged = activeSessions.some(function(si){ return state[b.id] && state[b.id][si] && state[b.id][si].flags[d]; });
+        activeSessions.forEach(function(si){
+          [state[b.id][si].coach[d], state[b.id][si].player[d]].forEach(function(r){
+            var c = ratingColor(r);
+            html += "<td style='padding:5px 8px;text-align:center;border:1px solid #e0e0e0'>" +
+              (r ? "<span style='display:inline-block;width:22px;height:22px;border-radius:50%;background:" + c + "22;border:1.5px solid " + c + ";color:" + c + ";font-size:11px;font-weight:700;line-height:20px;text-align:center'>" + r + "</span>"
+                 : "<span style='color:#ddd'>—</span>") + "</td>";
+          });
         });
-      });
+      }
       html += "</tr>";
     });
-    html += "</tbody></table>";
-
-    if (flaggedDrills.length) {
-      html += "<div style='margin-top:8px;padding:8px 12px;background:#FCEBEB;border-radius:6px;border-left:3px solid #E24B4A'>" +
-        "<div style='font-size:11px;font-weight:700;color:#A32D2D;margin-bottom:4px'>NEEDS WORK (" + flaggedDrills.length + ")</div>" +
-        flaggedDrills.map(function(d){ return "<div style='font-size:11px;color:#A32D2D'>&#x25CF; " + d + "</div>"; }).join("") + "</div>";
-    }
-    html += "</div>";
+    html += "</tbody></table></div>";
   });
 
   html += "<div style='text-align:center;font-size:11px;color:#bbb;margin-top:24px;padding-top:16px;border-top:1px solid #eee'>Built Different Sports &mdash; Player Development System</div>";
@@ -1102,7 +1120,7 @@ function printReport() {
 
 function shareReport() {
   var checkedSIs = getCheckedSessions();
-  if (checkedSIs.length === 0) { alert("Please select at least one session to share."); return; }
+  // Allow sharing even with no sessions — will send full program overview
   document.getElementById("share-modal").style.display = "flex";
 }
 
@@ -1122,18 +1140,22 @@ function sendShareEmail() {
   sendBtn.textContent = "Sending…";
   sendBtn.disabled = true;
 
-  var sessionLabels = checkedSIs.map(function(si){ return SESSION_META[si].label; }).join(", ");
-  var reportHTML = buildReportHTML(checkedSIs);
+  var noSessions = checkedSIs.length === 0;
+  var sessionLabels = noSessions ? "Full Program Overview" :
+    checkedSIs.map(function(si){ return SESSION_META[si].label; }).join(", ");
+  var reportHTML = buildReportHTML(noSessions ? [] : checkedSIs);
+  var p = roster.find(function(x){ return x.id === currentPlayerId; }) || {};
+  var playerName = p.name || "Player";
 
   emailjs.init("LreeRZ-I5KJvslRRd");
   emailjs.send("service_m51vzg6", "template_9v5qvox", {
     to_email: email,
     to_name: email,
     from_name: "Built Different Sports",
-    subject: "Progress Report — " + sessionLabels,
+    subject: "Built Different Sports — " + playerName + " " + sessionLabels,
     message: (msg ? msg + "\n\n" : "") +
-      "Hi,\n\nYour Built Different Sports progress report for " + sessionLabels + " is ready.\n\n" +
-      "View your report by opening the link below in your browser. Copy and save this page for your records.\n\n" +
+      "Hi,\n\nPlease find " + playerName + "'s Built Different Sports " +
+      (noSessions ? "8-week program overview" : "progress report for " + sessionLabels) + " attached.\n\n" +
       "— Built Different Sports Coach",
     report_html: reportHTML
   }).then(function() {
