@@ -2794,34 +2794,36 @@ function buildReportText(checkedSIs) {
   var playerName = profile.name || p.name || "Player";
   var noSessionData = !checkedSIs || checkedSIs.length === 0;
   var sessionLabels = noSessionData ? "Full Program Overview" :
-    checkedSIs.map(function(si){ return SESSION_META[si].label; }).join(", ");
+    checkedSIs.map(function(si){ return SESSION_META[si] ? SESSION_META[si].label : "Session " + (si+1); }).join(", ");
 
   var text = "BUILT DIFFERENT SPORTS\n";
   text += "Player: " + playerName + "\n";
   text += (noSessionData ? "Program Overview" : "Sessions: " + sessionLabels) + "\n";
   text += "Generated: " + new Date().toLocaleDateString("en-US", {month:"long",day:"numeric",year:"numeric"}) + "\n";
-  text += "\n────────────────────────────────────────\n\n";
+  text += "\n----------------------------------------\n\n";
 
   BLOCKS.forEach(function(b) {
     text += b.label.toUpperCase() + " — Weeks " + b.weeks + "\n";
-    text += "────────────────────────────────\n";
-    b.drills.forEach(function(d, i) {
+    text += "--------------------------------\n";
+    b.drills.forEach(function(d) {
       if (noSessionData) {
-        text += "  • " + d + "\n";
+        text += "  * " + d + "\n";
       } else {
         var activeSessions = b.si.filter(function(si){ return checkedSIs.indexOf(si) !== -1; });
         var ratings = activeSessions.map(function(si){
-          var c = state[b.id] && state[b.id][si] ? state[b.id][si].coach[d] : 0;
-          var pl = state[b.id] && state[b.id][si] ? state[b.id][si].player[d] : 0;
-          return SESSION_META[si].label + " → Coach: " + (c || "—") + " / Player: " + (pl || "—");
-        }).join("  |  ");
-        text += "  • " + d + "\n    " + ratings + "\n";
+          var sessionState = (state[b.id] && state[b.id][si]) ? state[b.id][si] : null;
+          var c  = sessionState ? (sessionState.coach[d]  || "—") : "—";
+          var pl = sessionState ? (sessionState.player[d] || "—") : "—";
+          var label = SESSION_META[si] ? SESSION_META[si].label : "Session " + (si+1);
+          return label + " (Coach: " + c + " / Player: " + pl + ")";
+        }).join(" | ");
+        text += "  * " + d + "\n    " + ratings + "\n";
       }
     });
     text += "\n";
   });
 
-  text += "────────────────────────────────────────\n";
+  text += "----------------------------------------\n";
   text += "Built Different Sports — Player Development System";
   return text;
 }
