@@ -1044,6 +1044,10 @@ function buildReportHTML(checkedSIs) {
   }
 
   BLOCKS.forEach(function(b) {
+    // Skip blocks that have no checked sessions (unless showing full overview)
+    var activeSessions = noSessionData ? [] : b.si.filter(function(si){ return checkedSIs.indexOf(si) !== -1; });
+    if (!noSessionData && activeSessions.length === 0) return;
+
     html += "<div style='margin-bottom:24px;page-break-inside:avoid'>";
     html += "<div style='display:flex;align-items:center;gap:10px;margin-bottom:8px'>" +
       "<div style='width:5px;height:36px;border-radius:3px;background:" + b.color + "'></div>" +
